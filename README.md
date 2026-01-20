@@ -4,12 +4,6 @@
 
 Python package for exploring bathymetric grids.
 
-## Installation
-
-```bash
-uv pip install .
-```
-
 ## Basic usage
 
 ```python
@@ -43,6 +37,12 @@ prof1 = bath.profile((-8, 52), (-2, 58), name="Profile 1")
 prof2 = bath.profile((-8, 53), (-2, 59), name="Profile 2")
 profile.plot_profiles([prof1, prof2])
 profile.compare_stats([prof1, prof2])
+```
+
+## Installation
+
+```bash
+uv pip install .
 ```
 
 ## Features
