@@ -1,7 +1,7 @@
 """Bathymetry class with loading, analysis, and visualisation."""
 
+import os
 import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 from urllib.request import urlretrieve
@@ -12,6 +12,7 @@ import numpy as np
 import polars as pl
 import rioxarray
 import xarray as xr
+from geographiclib.geodesic import Geodesic
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from xrspatial import hillshade
 
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 REGIONS = {
     # Atlantic Ocean
     "north_atlantic": (-80, 0, 40, 70),
-    "mid_atlantic_ridge": (-45, -15, -30, 30),  # Same as mid_ocean_ridge_atlantic below
+    "mid_atlantic_ridge": (-45, -15, -30, 30),
     "gulf_of_mexico": (-98, -80, 18, 31),
     "caribbean": (-90, -60, 10, 25),
     # Pacific Ocean
@@ -59,7 +60,6 @@ REGIONS = {
     "coral_sea": (145, 160, -25, -10),
     "tasman_sea": (150, 165, -45, -30),
     # Ridges & Features
-    "mid_ocean_ridge_atlantic": (-45, -15, -30, 30),
     "east_pacific_rise_full": (-115, -105, -55, 55),
     "southwest_indian_ridge": (20, 70, -50, -25),
     # Continental Margins
@@ -115,7 +115,7 @@ class Bathymetry:
 
     Parameters
     ----------
-    filepath : str or Path
+    filepath : str
         Path to the NetCDF file
     lon_range : tuple[float, float], optional
         Longitude bounds (min, max). Cannot be used with 'region'.
@@ -136,7 +136,7 @@ class Bathymetry:
     ----------
     data : xr.DataArray
         The elevation data
-    filepath : Path
+    filepath : str
         Path to source file
 
     Examples
@@ -151,7 +151,7 @@ class Bathymetry:
 
     def __init__(
         self,
-        filepath: str | Path,
+        filepath: str,
         lon_range: tuple[float, float] | None = None,
         lat_range: tuple[float, float] | None = None,
         region: str | None = None,
@@ -159,7 +159,7 @@ class Bathymetry:
         lon_name: str = "lon",
         lat_name: str = "lat",
     ):
-        self.filepath = Path(filepath)
+        self.filepath = filepath
 
         # Handle region parameter
         if region is not None:
@@ -200,7 +200,7 @@ class Bathymetry:
         lat_range: tuple[float, float] | None = None,
         region: str | None = None,
         year: int = 2025,
-        save_path: str | Path | None = None,
+        save_path: str | None = None,
     ) -> "Bathymetry":
         """
         Download GEBCO data from OPeNDAP server for a specific region.
@@ -219,7 +219,7 @@ class Bathymetry:
             Cannot be used with 'lon_range' or 'lat_range'.
         year : int, default 2025
             GEBCO dataset year
-        save_path : str or Path, optional
+        save_path : str, optional
             If provided, save the downloaded data to this path
 
         Returns
@@ -259,16 +259,47 @@ class Bathymetry:
         if lon_range is None or lat_range is None:
             raise ValueError("Must specify either 'region' or both 'lon_range' and 'lat_range'")
 
-        output_path = cls._download_gebco(lon_range, lat_range, year, save_path)
-        return cls(output_path, var_name="elevation", lon_name="lon", lat_name="lat")
+        filepath = cls._download_gebco(lon_range, lat_range, year, save_path)
+        return cls(filepath, var_name="elevation", lon_name="lon", lat_name="lat")
+
+    @classmethod
+    def from_array(cls, data: xr.DataArray) -> "Bathymetry":
+        """
+        Create a Bathymetry object directly from an xarray DataArray.
+
+        Parameters
+        ----------
+        data : xr.DataArray
+            Elevation data with 'lon' and 'lat' coordinates
+
+        Returns
+        -------
+        Bathymetry
+            Bathymetry object with the provided data
+
+        Examples
+        --------
+        >>> import xarray as xr
+        >>> import numpy as np
+        >>> data = xr.DataArray(
+        ...     np.random.rand(10, 10) * -100,
+        ...     coords={"lon": np.linspace(-10, -5, 10), "lat": np.linspace(50, 55, 10)},
+        ...     dims=["lat", "lon"],
+        ... )
+        >>> bath = Bathymetry.from_array(data)
+        """
+        obj = cls.__new__(cls)
+        obj.filepath = None
+        obj.data = data
+        return obj
 
     @staticmethod
     def _download_gebco(
         lon_range: tuple[float, float],
         lat_range: tuple[float, float],
         year: int,
-        save_path: str | Path | None,
-    ) -> Path:
+        save_path: str | None,
+    ) -> str:
         """Download GEBCO data from THREDDS server."""
         # Use THREDDS NetCDF Subset Service (NCSS) for fast server-side subsetting
         base_url = f"https://dap.ceda.ac.uk/thredds/ncss/bodc/gebco/global/gebco_{year}/ice_surface_elevation/netcdf/GEBCO_{year}.nc"
@@ -286,17 +317,17 @@ class Bathymetry:
 
         # Download the subset directly from server
         if save_path:
-            output_path = Path(save_path)
+            filepath = save_path
         else:
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".nc")
-            output_path = Path(temp_file.name)
+            filepath = temp_file.name
 
-        urlretrieve(ncss_url, output_path)
-        return output_path
+        urlretrieve(ncss_url, filepath)
+        return filepath
 
     def to_geotiff(
         self,
-        filepath: str | Path,
+        filepath: str,
         crs: str = "EPSG:4326",
         **kwargs,
     ) -> None:
@@ -305,7 +336,7 @@ class Bathymetry:
 
         Parameters
         ----------
-        filepath : str or Path
+        filepath : str
             Output GeoTIFF file path
         crs : str, default 'EPSG:4326'
             Coordinate reference system (e.g., 'EPSG:4326' for WGS84)
@@ -339,11 +370,12 @@ class Bathymetry:
         lat_name: str,
     ) -> xr.DataArray:
         """Load data from file based on file type."""
-        if not self.filepath.exists():
+        if not os.path.exists(self.filepath):
             raise FileNotFoundError(f"File not found: {self.filepath}")
 
         # Detect file type and load appropriately
-        if self.filepath.suffix.lower() in [".tif", ".tiff"]:
+        ext = os.path.splitext(self.filepath)[1].lower()
+        if ext in [".tif", ".tiff"]:
             return self._load_geotiff()
         return self._load_netcdf(lon_range, lat_range, var_name, lon_name, lat_name)
 
@@ -508,6 +540,123 @@ class Bathymetry:
             }
         )
 
+    def hypsometric_index(self) -> float:
+        """
+        Calculate the hypsometric index (HI).
+
+        The hypsometric index quantifies the distribution of elevation within a
+        region as a single value between 0 and 1:
+
+        HI = (mean - min) / (max - min)
+
+        Returns
+        -------
+        float
+            Hypsometric index where:
+            - HI > 0.5: Convex hypsometry (more area at higher elevations)
+            - HI ≈ 0.5: Equilibrium (S-shaped distribution)
+            - HI < 0.5: Concave hypsometry (more area at lower elevations)
+
+        Examples
+        --------
+        >>> bath = Bathymetry.from_gebco_opendap(region='mediterranean')
+        >>> hi = bath.hypsometric_index()
+        >>> print(f"Hypsometric Index: {hi:.3f}")
+        """
+        values = self._clean_values(self.data)
+        if len(values) == 0:
+            return np.nan
+        h_mean = np.mean(values)
+        h_min = np.min(values)
+        h_max = np.max(values)
+        if h_max == h_min:
+            return np.nan
+        return float((h_mean - h_min) / (h_max - h_min))
+
+    def hypsometric_curve(self, bins: int = 100) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate the hypsometric curve.
+
+        The hypsometric curve shows the cumulative distribution of area with
+        elevation, normalised to relative values (0 to 1).
+
+        Parameters
+        ----------
+        bins : int, default 100
+            Number of elevation bins
+
+        Returns
+        -------
+        relative_area : np.ndarray
+            Cumulative proportion of area above each elevation (1 to 0)
+        relative_elevation : np.ndarray
+            Normalised elevation (0 = min, 1 = max)
+
+        Examples
+        --------
+        >>> bath = Bathymetry.from_gebco_opendap(region='mediterranean')
+        >>> rel_area, rel_elev = bath.hypsometric_curve()
+        >>> plt.plot(rel_area, rel_elev)
+        >>> plt.xlabel('Relative Area (a/A)')
+        >>> plt.ylabel('Relative Elevation (h/H)')
+        """
+        values = self._clean_values(self.data)
+        h_min, h_max = values.min(), values.max()
+
+        bin_edges = np.linspace(h_min, h_max, bins + 1)
+        counts, _ = np.histogram(values, bins=bin_edges)
+
+        # Cumulative area above each elevation
+        cumulative = np.cumsum(counts[::-1])[::-1]
+        relative_area = cumulative / cumulative[0]
+
+        # Normalised elevation (bin centres)
+        bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2
+        relative_elevation = (bin_centres - h_min) / (h_max - h_min)
+
+        return relative_area, relative_elevation
+
+    def plot_hypsometric_curve(self, bins: int = 100, **kwargs) -> None:
+        """
+        Plot the hypsometric curve.
+
+        Parameters
+        ----------
+        bins : int, default 100
+            Number of elevation bins
+        **kwargs
+            Additional arguments passed to plt.plot
+
+        Examples
+        --------
+        >>> bath = Bathymetry.from_gebco_opendap(region='mediterranean')
+        >>> bath.plot_hypsometric_curve()
+        """
+        rel_area, rel_elev = self.hypsometric_curve(bins)
+
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.plot(rel_area, rel_elev, linewidth=2, **kwargs)
+        ax.plot([0, 1], [1, 0], "k--", alpha=0.3)
+        ax.set_xlabel("Relative Area (a/A)")
+        ax.set_ylabel("Relative Elevation (h/H)")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+        plt.show()
+
+    def _cell_size_metres(self) -> tuple[float, float]:
+        """Return (dy, dx) cell size in metres using geodesic measurement."""
+        lat_spacing = np.abs(np.diff(self.data.lat.values).mean())
+        lon_spacing = np.abs(np.diff(self.data.lon.values).mean())
+        lat_centre = float(self.data.lat.mean())
+        lon_centre = float(self.data.lon.mean())
+
+        geod = Geodesic.WGS84
+        dy = geod.Inverse(lat_centre, lon_centre, lat_centre + lat_spacing, lon_centre)["s12"]
+        dx = geod.Inverse(lat_centre, lon_centre, lat_centre, lon_centre + lon_spacing)["s12"]
+        return dy, dx
+
     def slope(self) -> xr.DataArray:
         """
         Calculate seafloor slope in degrees.
@@ -517,62 +666,25 @@ class Bathymetry:
         xr.DataArray
             Slope magnitude in degrees
         """
-        gy, gx = np.gradient(self.data.values)
-        slope_rad = np.arctan(np.sqrt(gx**2 + gy**2))
-        slope_deg = np.degrees(slope_rad)
+        dy, dx = self._cell_size_metres()
+        gy, gx = np.gradient(self.data.values, dy, dx)
+        slope_deg = np.degrees(np.arctan(np.sqrt(gx**2 + gy**2)))
         return xr.DataArray(slope_deg, coords=self.data.coords, dims=self.data.dims, name="slope")
-
-    def aspect(self) -> xr.DataArray:
-        """
-        Calculate aspect (direction of steepest descent) in degrees.
-
-        Returns
-        -------
-        xr.DataArray
-            Aspect in degrees (0-360)
-        """
-        gy, gx = np.gradient(self.data.values)
-        aspect_rad = np.arctan2(-gx, gy)
-        aspect_deg = (np.degrees(aspect_rad) + 360) % 360
-        return xr.DataArray(aspect_deg, coords=self.data.coords, dims=self.data.dims, name="aspect")
 
     def curvature(self) -> xr.DataArray:
         """
-        Calculate seafloor curvature (second derivative).
-
-        Curvature measures the rate of change of slope, identifying convex and
-        concave features in the bathymetry. This uses the Laplacian (sum of
-        second derivatives).
+        Calculate seafloor curvature (Laplacian).
 
         Returns
         -------
         xr.DataArray
-            Curvature values where:
-            - Positive values indicate upwardly convex features (ridges, seamounts)
-            - Negative values indicate upwardly concave features (valleys, trenches)
-            - Zero indicates flat surfaces
-
-        Examples
-        --------
-        Calculate curvature:
-
-        >>> curv = bath.curvature()
-        >>> print(f"Mean curvature: {curv.mean().values:.4f}")
-
-        Find highly convex features (ridges):
-
-        >>> ridges = curv.where(curv > curv.quantile(0.95))
+            Curvature values (positive = convex/ridges, negative = concave/valleys)
         """
-        # Calculate second derivatives (Laplacian)
-        # Using numpy.gradient twice for second derivatives
-        gy, gx = np.gradient(self.data.values)
-        gyy, _ = np.gradient(gy)
-        _, gxx = np.gradient(gx)
-
-        # Laplacian (sum of second derivatives)
-        laplacian = gxx + gyy
-
-        return xr.DataArray(laplacian, coords=self.data.coords, dims=self.data.dims, name="curvature")
+        dy, dx = self._cell_size_metres()
+        gy, gx = np.gradient(self.data.values, dy, dx)
+        gyy, _ = np.gradient(gy, dy, dx)
+        _, gxx = np.gradient(gx, dy, dx)
+        return xr.DataArray(gxx + gyy, coords=self.data.coords, dims=self.data.dims, name="curvature")
 
     # Profile and Swath methods
 
@@ -692,7 +804,7 @@ class Bathymetry:
         ax.set_ylabel("Latitude (°)")
         plt.show()
 
-    def plot_slope(self, contours: int | list[float] | None = None, **kwargs) -> None:
+    def plot_slope(self, contours: int | list[float] | None = None, vmax: float | None = None, **kwargs) -> None:
         """
         Plot seafloor slope.
 
@@ -702,14 +814,30 @@ class Bathymetry:
             If int, number of contour levels to plot
             If list, specific contour levels (in meters)
             If None, no contours are plotted
+        vmax : float, optional
+            Maximum slope value for colour scale. Useful for clipping outliers.
+            Default uses the 99th percentile to avoid extreme values dominating.
         **kwargs
             Additional arguments passed to imshow
         """
         slope_data = self.slope()
         extent = get_extent(self.data)
 
+        # Use 99th percentile as default vmax to handle outliers
+        if vmax is None:
+            vmax = float(np.nanpercentile(slope_data.values, 99))
+
         fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(slope_data.values, cmap=cmo.amp, origin="lower", extent=extent, aspect="auto", **kwargs)
+        im = ax.imshow(
+            slope_data.values,
+            cmap="Greys",  # Grey scale: white=flat, dark grey=steep
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            vmin=0,
+            vmax=vmax,
+            **kwargs,
+        )
         plt.colorbar(im, ax=ax, label="Slope (°)")
 
         if contours is not None:
@@ -846,7 +974,15 @@ class Bathymetry:
         ax.set_ylabel("Latitude (°)")
         plt.show()
 
-    def plot_surface3d(self, stride: int = 10, vertical_exaggeration: float = 50.0, **kwargs) -> None:
+    def plot_surface3d(
+        self,
+        stride: int = 10,
+        vertical_exaggeration: float = 50.0,
+        smooth: int | None = None,
+        elev: float = 30,
+        azim: float = -60,
+        **kwargs,
+    ) -> None:
         """
         Create static 3D surface plot.
 
@@ -856,10 +992,17 @@ class Bathymetry:
             Stride for downsampling the data (every Nth point)
         vertical_exaggeration : float, default 50.0
             Factor to exaggerate the vertical scale for better visualisation.
+        smooth : int, optional
+            Apply a uniform filter with this kernel size to smooth the surface.
+            Typical values are 3-7.
+        elev : float, default 30
+            Elevation viewing angle in degrees. 0 is horizontal, 90 is directly above.
+        azim : float, default -60
+            Azimuth viewing angle in degrees. Rotates around the vertical axis.
         **kwargs
             Additional arguments passed to plot_surface
         """
-        fig = plt.figure(figsize=(12, 8))
+        fig = plt.figure(figsize=(14, 8))
         ax = fig.add_subplot(111, projection="3d")
 
         # Downsample data
@@ -867,20 +1010,27 @@ class Bathymetry:
         lat = self.data.lat.values[::stride]
         z = self.data.values[::stride, ::stride]
 
+        # Apply smoothing if requested
+        if smooth is not None:
+            from scipy.ndimage import uniform_filter  # noqa: PLC0415
+
+            z = uniform_filter(z, size=smooth, mode="nearest")
+
         lon_grid, lat_grid = np.meshgrid(lon, lat)
 
-        # Plot surface with vertical exaggeration
         surf = ax.plot_surface(lon_grid, lat_grid, z, cmap=cmo.deep_r, linewidth=0, antialiased=True, **kwargs)
+        fig.colorbar(surf, ax=ax, label="Elevation (m)", shrink=0.5, pad=0.1)
 
-        fig.colorbar(surf, ax=ax, label="Elevation (m)", shrink=0.5)
+        # Set aspect ratio accounting for longitude compression at higher latitudes
+        lat_centre = float(self.data.lat.mean())
+        lon_scale = np.cos(np.radians(lat_centre))
+        ax.set_box_aspect([np.ptp(lon) * lon_scale, np.ptp(lat), np.ptp(z) * vertical_exaggeration / 1000])
 
-        # Set aspect ratio to control vertical exaggeration
-        ax.set_box_aspect([np.ptp(lon), np.ptp(lat), np.ptp(z) * vertical_exaggeration / 1000])
-
+        ax.view_init(elev=elev, azim=azim)
         ax.set_xlabel("Longitude (°)")
         ax.set_ylabel("Latitude (°)")
         ax.set_zlabel("Elevation (m)")
-
+        plt.tight_layout()
         plt.show()
 
     def __repr__(self) -> str:

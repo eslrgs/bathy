@@ -10,7 +10,7 @@ Python package for exploring bathymetric grids.
 from bathy import Bathymetry
 
 # Load data
-bath = Bathymetry('GEBCO_2023.nc', lon_range=(-10, 0), lat_range=(50, 60))
+bath = Bathymetry('GEBCO_2025.nc', lon_range=(-10, 0), lat_range=(50, 60))
 
 # Analyse
 stats = bath.summary()
