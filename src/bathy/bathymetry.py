@@ -790,7 +790,7 @@ class Bathymetry:
         **kwargs
             Additional arguments passed to imshow
         """
-        shaded = hillshade(self.data, azimuth=azimuth, angle_altitude=altitude)
+        shaded = hillshade(-self.data, azimuth=azimuth, angle_altitude=altitude)
 
         extent = get_extent(self.data)
 
