@@ -9,8 +9,11 @@ Python package for exploring bathymetric grids.
 ```python
 from bathy import Bathymetry
 
-# Load data
+# Load from file
 bath = Bathymetry('GEBCO_2025.nc', lon_range=(-10, 0), lat_range=(50, 60))
+
+# Or download GEBCO data via CEDA (no local file needed)
+bath = Bathymetry.from_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
 
 # Analyse
 stats = bath.summary()
@@ -48,14 +51,13 @@ uv pip install .
 ## Features
 
 **Bathymetry class:**
-- Analysis: `summary()`, `depth_stats()`, `coverage()`, `slope()`, `aspect()`, `curvature()`
+- Analysis: `summary()`, `depth_stats()`, `coverage()`, `slope()`, `curvature()`, `hypsometric_index()`, `hypsometric_curve()`
 - Plotting: `plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_curvature()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`
 - Profiles: `profile()`
 
 **Profile class:**
-- Analysis: `stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`
+- Analysis: `stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `from_coordinates()`, `cross_sections()`, `from_shapefile()`
 - Plotting: `plot()`, `plot_gradient()`, `plot_canyons()`
-- Constructors: `from_coordinates()`, `cross_sections()`, `from_shapefile()`
 
 **Multi-profile functions (profile module):**
 - Analysis: `compare_stats()`
@@ -63,7 +65,7 @@ uv pip install .
 
 ## Preset regions
 
-33 preset regions available:
+32 preset regions available:
 
 ```python
 from bathy import list_regions, Bathymetry
@@ -82,7 +84,8 @@ See [notebooks/basic_usage.ipynb](notebooks/basic_usage.ipynb) and [notebooks/pr
 ```bash
 git clone https://github.com/eslrgs/bathy.git
 cd bathy
-uv sync --all-groups
+uv sync
+pre-commit install
 ```
 
 ## License
