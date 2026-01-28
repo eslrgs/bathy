@@ -12,7 +12,7 @@ from bathy import Bathymetry
 # Load from file
 bath = Bathymetry('GEBCO_2025.nc', lon_range=(-10, 0), lat_range=(50, 60))
 
-# Or download GEBCO data via CEDA (no local file needed)
+# Or download GEBCO data via CEDA
 bath = Bathymetry.from_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
 
 # Analyse
