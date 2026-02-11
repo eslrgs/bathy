@@ -1,8 +1,11 @@
 # 🌐 bathy
 
 ![Status](https://img.shields.io/badge/status-experimental-red)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://eslrgs.github.io/bathy)
 
 Python package for exploring bathymetric grids.
+
+**[Documentation](https://eslrgs.github.io/bathy)** · [Installation](#installation) · [Examples](#examples)
 
 ## Basic usage
 

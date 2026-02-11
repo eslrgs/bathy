@@ -37,6 +37,9 @@ dev = [
     "pre-commit>=4.5.0",
     "ruff>=0.14.8",
     "pytest>=8.0.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.1",
+    "mkdocstrings[python]>=1.0.3",
 ]
 
 [build-system]
