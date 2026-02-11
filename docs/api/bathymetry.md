@@ -12,6 +12,7 @@
         - coverage
         - slope
         - curvature
+        - bpi
         - hypsometric_index
         - hypsometric_curve
         - profile
@@ -19,6 +20,7 @@
         - plot_hillshade
         - plot_slope
         - plot_curvature
+        - plot_bpi
         - plot_histogram
         - plot_depth_zones
         - plot_hypsometric_curve

@@ -53,6 +53,14 @@ bath.plot_curvature()
 
 Positive values indicate convex features (ridges), negative indicate concave features (valleys).
 
+### Bathymetric Position Index (BPI)
+
+```python
+bath.plot_bpi(radius_km=2.0)
+```
+
+BPI identifies ridges (positive) and valleys (negative) relative to the surrounding terrain. The `radius_km` parameter controls the neighbourhood size.
+
 ## Depth zones
 
 Classify bathymetry into depth zones:
