@@ -1,6 +1,7 @@
 """Tests for bathymetry module."""
 
 import numpy as np
+import xarray as xr
 
 from bathy.bathymetry import Bathymetry, list_regions
 
@@ -122,6 +123,58 @@ def test_curvature_calculation(fake_bathy):
 
     assert curv.shape == fake_bathy.shape
     assert curv.name == "curvature"
+
+
+def test_bpi_calculation(fake_bathy):
+    """Calculate Bathymetric Position Index."""
+    bpi = fake_bathy.bpi(radius_km=1.0)
+
+    assert bpi.shape == fake_bathy.shape
+    assert bpi.name == "bpi"
+
+
+def test_bpi_flat_surface_is_zero(flat_bathy):
+    """Flat surface should have BPI ≈ 0 everywhere."""
+    bpi = flat_bathy.bpi(radius_km=1.0)
+
+    # All values should be near zero (within floating point tolerance)
+    assert np.allclose(bpi.values, 0, atol=1e-10)
+
+
+def test_bpi_peak_is_positive():
+    """A peak (high point surrounded by low) should have positive BPI."""
+    # Create grid with a peak in the centre
+    elevations = np.full((21, 21), -1000.0)
+    elevations[10, 10] = -500.0  # Peak (shallower than surroundings)
+
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 21), "lat": np.linspace(50, 55, 21)},
+        dims=["lat", "lon"],
+    )
+    bath = Bathymetry.from_array(data)
+    bpi = bath.bpi(radius_km=50)  # Large radius to capture the peak
+
+    # Centre point should have positive BPI (higher than surroundings)
+    assert bpi.values[10, 10] > 0
+
+
+def test_bpi_valley_is_negative():
+    """A valley (low point surrounded by high) should have negative BPI."""
+    # Create grid with a valley in the centre
+    elevations = np.full((21, 21), -500.0)
+    elevations[10, 10] = -1000.0  # Valley (deeper than surroundings)
+
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 21), "lat": np.linspace(50, 55, 21)},
+        dims=["lat", "lon"],
+    )
+    bath = Bathymetry.from_array(data)
+    bpi = bath.bpi(radius_km=50)
+
+    # Centre point should have negative BPI (lower than surroundings)
+    assert bpi.values[10, 10] < 0
 
 
 def test_from_gebco_opendap_skips_download_if_file_exists(temp_netcdf, monkeypatch):

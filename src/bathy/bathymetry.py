@@ -697,6 +697,42 @@ class Bathymetry:
         _, gxx = np.gradient(gx, dy, dx)
         return xr.DataArray(gxx + gyy, coords=self.data.coords, dims=self.data.dims, name="curvature")
 
+    def bpi(self, radius_km: float = 1.0) -> xr.DataArray:
+        """
+        Calculate Bathymetric Position Index (BPI).
+
+        BPI measures the relative position of a point compared to its surroundings.
+        Positive values indicate ridges or peaks, negative values indicate valleys
+        or depressions, and values near zero indicate flat areas or mid-slopes.
+
+        Parameters
+        ----------
+        radius_km : float, default 1.0
+            Radius of the neighbourhood in kilometres (square window)
+
+        Returns
+        -------
+        xr.DataArray
+            BPI values (positive = ridges, negative = valleys)
+
+        Examples
+        --------
+        >>> bpi = bath.bpi(radius_km=2.0)
+        >>> bath.plot_bpi(radius_km=2.0)
+        """
+        from scipy.ndimage import uniform_filter  # noqa: PLC0415
+
+        # Convert radius to grid cells
+        dy, dx = self._cell_size_metres()
+        cell_size = (dy + dx) / 2
+        window_size = max(3, int(2 * radius_km * 1000 / cell_size) + 1)
+
+        # Calculate neighbourhood mean using fast uniform filter
+        neighbourhood_mean = uniform_filter(self.data.values.astype(float), size=window_size, mode="nearest")
+        bpi_values = self.data.values - neighbourhood_mean
+
+        return xr.DataArray(bpi_values, coords=self.data.coords, dims=self.data.dims, name="bpi")
+
     # Profile and Swath methods
 
     def profile(
@@ -898,6 +934,52 @@ class Bathymetry:
             **kwargs,
         )
         plt.colorbar(im, ax=ax, label="Curvature")
+
+        if contours is not None:
+            self._add_contours(ax, contours)
+
+        ax.set_xlabel("Longitude (°)")
+        ax.set_ylabel("Latitude (°)")
+        plt.show()
+
+    def plot_bpi(self, radius_km: float = 1.0, contours: int | list[float] | None = None, **kwargs) -> None:
+        """
+        Plot Bathymetric Position Index (BPI).
+
+        Parameters
+        ----------
+        radius_km : float, default 1.0
+            Radius of the circular neighbourhood in kilometres
+        contours : int or list[float], optional
+            If int, number of contour levels to plot
+            If list, specific contour levels (in metres)
+            If None, no contours are plotted
+        **kwargs
+            Additional arguments passed to imshow
+
+        Notes
+        -----
+        Uses a diverging colourmap centred on zero:
+        - Red/warm colours indicate positive BPI (ridges, peaks)
+        - Blue/cool colours indicate negative BPI (valleys, depressions)
+        """
+        bpi_data = self.bpi(radius_km)
+        extent = get_extent(self.data)
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        vmax = np.nanmax(np.abs(bpi_data.values))
+        im = ax.imshow(
+            bpi_data.values,
+            cmap=cmo.balance,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            vmin=-vmax,
+            vmax=vmax,
+            **kwargs,
+        )
+        plt.colorbar(im, ax=ax, label=f"BPI (r={radius_km} km)")
 
         if contours is not None:
             self._add_contours(ax, contours)
