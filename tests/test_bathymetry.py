@@ -122,3 +122,25 @@ def test_curvature_calculation(fake_bathy):
 
     assert curv.shape == fake_bathy.shape
     assert curv.name == "curvature"
+
+
+def test_from_gebco_opendap_skips_download_if_file_exists(temp_netcdf, monkeypatch):
+    """from_gebco_opendap skips download if save_path exists."""
+    download_called = False
+
+    def mock_download(*args, **kwargs):
+        nonlocal download_called
+        download_called = True
+        return temp_netcdf
+
+    monkeypatch.setattr(Bathymetry, "_download_gebco", mock_download)
+
+    # Should load from existing file without downloading
+    bath = Bathymetry.from_gebco_opendap(
+        lon_range=(-10, -5),
+        lat_range=(50, 55),
+        save_path=temp_netcdf,
+    )
+
+    assert not download_called
+    assert bath.shape == (20, 20)

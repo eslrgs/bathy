@@ -1,10 +1,11 @@
 """Bathymetry class with loading, analysis, and visualisation."""
 
+import logging
 import os
 import tempfile
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
-from urllib.request import urlretrieve
+from urllib.request import urlopen
 
 import cmocean.cm as cmo
 import matplotlib.pyplot as plt
@@ -14,6 +15,7 @@ import rioxarray
 import xarray as xr
 from geographiclib.geodesic import Geodesic
 from matplotlib.colors import BoundaryNorm, ListedColormap
+from tqdm import tqdm
 from xrspatial import hillshade
 
 from bathy.utils import get_extent
@@ -23,6 +25,7 @@ if TYPE_CHECKING:
 
     from bathy.profile import Profile
 
+logger = logging.getLogger(__name__)
 
 # Preset regions dictionary: {name: (lon_min, lon_max, lat_min, lat_max)}
 REGIONS = {
@@ -259,7 +262,12 @@ class Bathymetry:
         if lon_range is None or lat_range is None:
             raise ValueError("Must specify either 'region' or both 'lon_range' and 'lat_range'")
 
-        filepath = cls._download_gebco(lon_range, lat_range, year, save_path)
+        if save_path and os.path.exists(save_path):
+            logger.info(f"Using existing file: {save_path}")
+            filepath = save_path
+        else:
+            filepath = cls._download_gebco(lon_range, lat_range, year, save_path)
+
         return cls(filepath, var_name="elevation", lon_name="lon", lat_name="lat")
 
     @classmethod
@@ -301,10 +309,6 @@ class Bathymetry:
         save_path: str | None,
     ) -> str:
         """Download GEBCO data from THREDDS server."""
-        # Use THREDDS NetCDF Subset Service (NCSS) for fast server-side subsetting
-        base_url = f"https://dap.ceda.ac.uk/thredds/ncss/bodc/gebco/global/gebco_{year}/ice_surface_elevation/netcdf/GEBCO_{year}.nc"
-
-        # Build query parameters for spatial subset
         params = {
             "var": "elevation",
             "north": max(lat_range),
@@ -313,16 +317,23 @@ class Bathymetry:
             "east": max(lon_range),
         }
 
+        base_url = f"https://dap.ceda.ac.uk/thredds/ncss/bodc/gebco/global/gebco_{year}/ice_surface_elevation/netcdf/GEBCO_{year}.nc"
         ncss_url = f"{base_url}?{urlencode(params)}"
 
-        # Download the subset directly from server
-        if save_path:
-            filepath = save_path
-        else:
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".nc")
-            filepath = temp_file.name
+        filepath = save_path or tempfile.NamedTemporaryFile(delete=False, suffix=".nc").name
 
-        urlretrieve(ncss_url, filepath)
+        logger.info(f"Downloading GEBCO {year} data from CEDA...")
+
+        response = urlopen(ncss_url)
+        total = int(response.headers.get("Content-Length", 0))
+
+        with open(filepath, "wb") as f, tqdm(total=total, unit="B", unit_scale=True, desc="Downloading GEBCO") as pbar:
+            while chunk := response.read(8192):
+                f.write(chunk)
+                pbar.update(len(chunk))
+
+        logger.info(f"Saved to {filepath}")
+
         return filepath
 
     def to_geotiff(

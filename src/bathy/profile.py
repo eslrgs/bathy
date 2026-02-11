@@ -101,6 +101,11 @@ class Profile:
         # Extract profile elevations and distances
         self.elevations, self.distances = self._extract_profile()
 
+    def __repr__(self) -> str:
+        name = f'"{self.name}", ' if self.name else ""
+        max_depth = np.nanmin(self.elevations)
+        return f"Profile({name}{self.distances[-1]:.1f} km, max_depth={max_depth:.0f} m)"
+
     @classmethod
     def from_coordinates(
         cls,
@@ -569,6 +574,69 @@ class Profile:
 
         # Normalize by relief
         return median_deviation / relief
+
+    def knickpoints(self, threshold: float | None = None, smooth: float | None = None) -> pl.DataFrame:
+        """
+        Identify knickpoints (abrupt slope changes) along the profile.
+
+        Parameters
+        ----------
+        threshold : float, optional
+            Minimum rate of slope change (degrees/km) to qualify as a knickpoint.
+            If None, uses 2 standard deviations above mean.
+        smooth : float, optional
+            Gaussian smoothing sigma before detection. Useful for noisy data.
+
+        Returns
+        -------
+        pl.DataFrame
+            Knickpoints with columns: distance_km, depth_m, slope_break
+        """
+        elevations = gaussian_filter1d(self.elevations, smooth) if smooth else self.elevations
+        grad = np.gradient(elevations, self.distances * 1000)  # m/m
+        slope_deg = np.degrees(np.arctan(np.abs(grad)))
+        slope_break = np.abs(np.gradient(slope_deg, self.distances))  # deg/km
+
+        if threshold is None:
+            threshold = np.mean(slope_break) + 2 * np.std(slope_break)
+
+        peaks, properties = find_peaks(slope_break, height=threshold)
+
+        return pl.DataFrame(
+            {
+                "distance_km": self.distances[peaks],
+                "depth_m": self.elevations[peaks],
+                "slope_break": properties["peak_heights"],
+            }
+        )
+
+    def plot_knickpoints(self, knickpoints: pl.DataFrame, **kwargs):
+        """
+        Plot profile with knickpoints marked.
+
+        Parameters
+        ----------
+        knickpoints : pl.DataFrame
+            Result from knickpoints()
+        **kwargs
+            Additional arguments passed to profile plot
+
+        Returns
+        -------
+        Figure, list[Axes]
+            Matplotlib figure and axes
+        """
+        fig, axes = self.plot(**kwargs)
+        axes[0].scatter(
+            knickpoints["distance_km"],
+            knickpoints["depth_m"],
+            c="red",
+            s=50,
+            zorder=5,
+            label="Knickpoints",
+        )
+        axes[0].legend()
+        return fig, axes
 
     def plot_gradient(self, **kwargs):
         """

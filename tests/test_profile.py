@@ -79,3 +79,30 @@ def test_ensure_descending_topography():
     dist_out, elev_out = Profile._ensure_descending(distances, elevations_asc)
     assert np.array_equal(dist_out, distances[::-1])
     assert np.array_equal(elev_out, elevations_asc[::-1])
+
+
+def test_knickpoints_returns_dataframe(fake_data):
+    """Knickpoints returns DataFrame with expected columns."""
+    prof = Profile(fake_data, -9, 52, -6, 53, num_points=50)
+    kp = prof.knickpoints()
+
+    assert hasattr(kp, "columns")
+    assert set(kp.columns) == {"distance_km", "depth_m", "slope_break"}
+
+
+def test_knickpoints_with_threshold(fake_data):
+    """Higher threshold returns fewer knickpoints."""
+    prof = Profile(fake_data, -9, 52, -6, 53, num_points=50)
+
+    kp_low = prof.knickpoints(threshold=0.1)
+    kp_high = prof.knickpoints(threshold=100)
+
+    assert len(kp_high) <= len(kp_low)
+
+
+def test_knickpoints_with_smoothing(fake_data):
+    """Smoothing parameter is accepted."""
+    prof = Profile(fake_data, -9, 52, -6, 53, num_points=50)
+    kp = prof.knickpoints(smooth=3)
+
+    assert set(kp.columns) == {"distance_km", "depth_m", "slope_break"}
