@@ -91,6 +91,11 @@ uv sync
 pre-commit install
 ```
 
+```bash
+just format  # Format and lint
+just test    # Run tests
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
