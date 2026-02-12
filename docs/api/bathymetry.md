@@ -6,7 +6,9 @@
         - __init__
         - from_gebco_opendap
         - from_array
+        - clip
         - to_geotiff
+        - to_netcdf
         - summary
         - depth_stats
         - coverage

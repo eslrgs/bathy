@@ -301,6 +301,37 @@ class Bathymetry:
         obj.data = data
         return obj
 
+    def clip(
+        self,
+        lon_range: tuple[float, float] | None = None,
+        lat_range: tuple[float, float] | None = None,
+    ) -> "Bathymetry":
+        """
+        Clip to a smaller region, returning a new Bathymetry object.
+
+        Parameters
+        ----------
+        lon_range : tuple[float, float], optional
+            Longitude bounds (min, max)
+        lat_range : tuple[float, float], optional
+            Latitude bounds (min, max)
+
+        Returns
+        -------
+        Bathymetry
+            New Bathymetry object with clipped data
+
+        Examples
+        --------
+        >>> subset = bath.clip(lon_range=(-5, 5), lat_range=(35, 40))
+        """
+        data = self.data
+        if lon_range is not None:
+            data = data.sel(lon=slice(*lon_range))
+        if lat_range is not None:
+            data = data.sel(lat=slice(*sorted(lat_range)))
+        return Bathymetry.from_array(data)
+
     @staticmethod
     def _download_gebco(
         lon_range: tuple[float, float],
@@ -369,6 +400,23 @@ class Bathymetry:
             self.data = self.data.rio.write_crs(crs)
 
         self.data.rio.to_raster(filepath, **kwargs)
+
+    def to_netcdf(self, filepath: str, **kwargs) -> None:
+        """
+        Save bathymetry data to a NetCDF file.
+
+        Parameters
+        ----------
+        filepath : str
+            Output NetCDF file path
+        **kwargs
+            Additional arguments passed to xarray.DataArray.to_netcdf()
+
+        Examples
+        --------
+        >>> bath.to_netcdf('output.nc')
+        """
+        self.data.to_netcdf(filepath, **kwargs)
 
     # Internal utilities
 
@@ -949,19 +997,13 @@ class Bathymetry:
         Parameters
         ----------
         radius_km : float, default 1.0
-            Radius of the circular neighbourhood in kilometres
+            Radius of the neighbourhood in kilometres (square window)
         contours : int or list[float], optional
             If int, number of contour levels to plot
             If list, specific contour levels (in metres)
             If None, no contours are plotted
         **kwargs
             Additional arguments passed to imshow
-
-        Notes
-        -----
-        Uses a diverging colourmap centred on zero:
-        - Red/warm colours indicate positive BPI (ridges, peaks)
-        - Blue/cool colours indicate negative BPI (valleys, depressions)
         """
         bpi_data = self.bpi(radius_km)
         extent = get_extent(self.data)

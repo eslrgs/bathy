@@ -177,6 +177,34 @@ def test_bpi_valley_is_negative():
     assert bpi.values[10, 10] < 0
 
 
+def test_clip(fake_bathy):
+    """Clip returns a Bathymetry object bounded by the requested range."""
+    clipped = fake_bathy.clip(lon_range=(-9, -7), lat_range=(51, 54))
+
+    lon_min, lon_max = clipped.lon_range
+    lat_min, lat_max = clipped.lat_range
+
+    # All data within requested bounds
+    assert -9 <= lon_min and lon_max <= -7
+    assert 51 <= lat_min and lat_max <= 54
+
+    # Covers most of the requested range (within one grid cell)
+    cell_size = 5 / 19  # fake_bathy grid spacing
+    assert lon_min < -9 + cell_size
+    assert lon_max > -7 - cell_size
+    assert lat_min < 51 + cell_size
+    assert lat_max > 54 - cell_size
+
+
+def test_to_netcdf(fake_bathy, tmp_path):
+    """Export and reload NetCDF round-trips correctly."""
+    filepath = str(tmp_path / "test_output.nc")
+    fake_bathy.to_netcdf(filepath)
+
+    reloaded = Bathymetry(filepath)
+    assert reloaded.shape == fake_bathy.shape
+
+
 def test_from_gebco_opendap_skips_download_if_file_exists(temp_netcdf, monkeypatch):
     """from_gebco_opendap skips download if save_path exists."""
     download_called = False
