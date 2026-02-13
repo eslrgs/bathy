@@ -74,8 +74,8 @@ def test_canyon_measurements_in_metres(fake_data):
     canyons = prof.get_canyons(prominence=5)
 
     if len(canyons) > 0:
-        # Profile distances are in km, so canyon distances in metres should be >= 1000 * min_km
-        # or at least positive and reasonable for the scale
+        # Canyon distances should be positive and
+        # reasonable for the scale
         assert all(canyons["floor_distance"] >= 0)
         assert all(canyons["width"] >= 0)
         assert all(canyons["depth"] >= 0)

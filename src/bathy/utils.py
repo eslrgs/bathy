@@ -17,4 +17,9 @@ def get_extent(data: xr.DataArray) -> list[float]:
     list[float]
         Extent as [lon_min, lon_max, lat_min, lat_max]
     """
-    return [float(data.lon.min()), float(data.lon.max()), float(data.lat.min()), float(data.lat.max())]
+    return [
+        float(data.lon.min()),
+        float(data.lon.max()),
+        float(data.lat.min()),
+        float(data.lat.max()),
+    ]

@@ -96,7 +96,9 @@ class Profile:
         self._validate_coordinates(data, end_lon, end_lat, "end")
 
         # Determine number of points
-        self.num_points = self._calculate_num_points(start_lon, start_lat, end_lon, end_lat, num_points, point_spacing)
+        self.num_points = self._calculate_num_points(
+            start_lon, start_lat, end_lon, end_lat, num_points, point_spacing
+        )
 
         # Extract profile elevations and distances
         self.elevations, self.distances = self._extract_profile()
@@ -104,7 +106,9 @@ class Profile:
     def __repr__(self) -> str:
         name = f'"{self.name}", ' if self.name else ""
         max_depth = np.nanmin(self.elevations)
-        return f"Profile({name}{self.distances[-1]:.1f} km, max_depth={max_depth:.0f} m)"
+        return (
+            f"Profile({name}{self.distances[-1]:.1f} km, max_depth={max_depth:.0f} m)"
+        )
 
     @classmethod
     def from_coordinates(
@@ -210,7 +214,8 @@ class Profile:
         interval_km : float
             Spacing between cross-sections in kilometers (must be positive)
         section_width_km : float
-            Total width of each cross-section in kilometers (half on each side, must be positive)
+            Total width of each cross-section in kilometers
+            (half on each side, must be positive)
         num_points : int, optional
             Number of points along each cross-section
         point_spacing : float, optional
@@ -224,13 +229,17 @@ class Profile:
         Examples
         --------
         >>> prof = bath.profile(-9.5, 52.0, -5.5, 54.0)
-        >>> sections = Profile.cross_sections(bath.data, prof, interval_km=10, section_width_km=20)
+        >>> sections = Profile.cross_sections(
+        ...     bath.data, prof, interval_km=10, section_width_km=20
+        ... )
         """
         # Validate parameters
         if interval_km <= 0:
             raise ValueError(f"interval_km must be positive, got {interval_km}")
         if section_width_km <= 0:
-            raise ValueError(f"section_width_km must be positive, got {section_width_km}")
+            raise ValueError(
+                f"section_width_km must be positive, got {section_width_km}"
+            )
 
         # Calculate total distance
         total_distance = profile.distances[-1]
@@ -243,7 +252,9 @@ class Profile:
         geod = Geodesic.WGS84
 
         # Calculate the bearing of the main profile
-        result = geod.Inverse(profile.start_lat, profile.start_lon, profile.end_lat, profile.end_lon)
+        result = geod.Inverse(
+            profile.start_lat, profile.start_lon, profile.end_lat, profile.end_lon
+        )
         profile_bearing = result["azi1"]
 
         # Create cross-sections
@@ -253,7 +264,9 @@ class Profile:
             dist_m = dist_km * 1000
 
             # Get position along the great circle
-            line_result = geod.InverseLine(profile.start_lat, profile.start_lon, profile.end_lat, profile.end_lon)
+            line_result = geod.InverseLine(
+                profile.start_lat, profile.start_lon, profile.end_lat, profile.end_lon
+            )
             pos = line_result.Position(dist_m)
             center_lon = pos["lon2"]
             center_lat = pos["lat2"]
@@ -265,7 +278,9 @@ class Profile:
             half_width_m = (section_width_km / 2) * 1000
 
             # Start point (perpendicular bearing)
-            start_result = geod.Direct(center_lat, center_lon, perp_bearing, half_width_m)
+            start_result = geod.Direct(
+                center_lat, center_lon, perp_bearing, half_width_m
+            )
             start_lon = start_result["lon2"]
             start_lat = start_result["lat2"]
 
@@ -278,7 +293,14 @@ class Profile:
             # Create profile for this cross-section
             section_name = f"Section_{i + 1}_at_{dist_km:.1f}km"
             section = cls(
-                data, start_lon, start_lat, end_lon, end_lat, num_points=num_points, point_spacing=point_spacing, name=section_name
+                data,
+                start_lon,
+                start_lat,
+                end_lon,
+                end_lat,
+                num_points=num_points,
+                point_spacing=point_spacing,
+                name=section_name,
             )
             sections.append(section)
 
@@ -304,7 +326,8 @@ class Profile:
         shapefile_path : str
             Path to shapefile containing LineString or MultiLineString features
         id_column : str, optional
-            Column name to use for profile naming/ID. If None, uses sequential numbering.
+            Column name to use for profile naming/ID.
+            If None, uses sequential numbering.
 
         Returns
         -------
@@ -313,12 +336,17 @@ class Profile:
 
         Examples
         --------
-        >>> profiles = Profile.from_shapefile(bath.data, "canyons.shp", id_column="NAME")
+        >>> profiles = Profile.from_shapefile(
+        ...     bath.data, "canyons.shp", id_column="NAME"
+        ... )
         """
         try:
             import geopandas as gpd
         except ImportError:
-            raise ImportError("geopandas is required for shapefile support. Install with: pip install geopandas")
+            raise ImportError(
+                "geopandas is required for shapefile support. "
+                "Install with: pip install geopandas"
+            )
 
         profiles = []
         skipped = 0
@@ -337,7 +365,10 @@ class Profile:
             elif geom.geom_type == "MultiLineString":
                 linestrings.extend(geom.geoms)
             else:
-                logger.warning(f"Skipping feature {idx}: unsupported geometry type {geom.geom_type}")
+                logger.warning(
+                    f"Skipping feature {idx}: unsupported "
+                    f"geometry type {geom.geom_type}"
+                )
                 skipped += 1
                 continue
 
@@ -349,7 +380,10 @@ class Profile:
                 lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
                 lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
 
-                within_bounds = any(lon_min <= lon <= lon_max and lat_min <= lat <= lat_max for lon, lat in coords)
+                within_bounds = any(
+                    lon_min <= lon <= lon_max and lat_min <= lat <= lat_max
+                    for lon, lat in coords
+                )
 
                 if not within_bounds:
                     skipped += 1
@@ -368,31 +402,47 @@ class Profile:
                     attributes["sub_index"] = sub_idx
 
                 # Use Profile.from_coordinates classmethod
-                profile = cls.from_coordinates(data=data, coordinates=coords, name=name, metadata=attributes)
+                profile = cls.from_coordinates(
+                    data=data, coordinates=coords, name=name, metadata=attributes
+                )
                 profiles.append(profile)
 
         if skipped > 0:
-            logger.warning(f"Skipped {skipped} feature(s) outside DEM bounds or with unsupported geometry")
+            logger.warning(
+                f"Skipped {skipped} feature(s) outside DEM "
+                f"bounds or with unsupported geometry"
+            )
 
         return profiles
 
     @staticmethod
-    def _validate_coordinates(data: xr.DataArray, lon: float, lat: float, param_name: str) -> None:
+    def _validate_coordinates(
+        data: xr.DataArray, lon: float, lat: float, param_name: str
+    ) -> None:
         """Validate that coordinates are within data bounds."""
         lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
         lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
 
         if not (lon_min <= lon <= lon_max):
-            raise ValueError(f"{param_name} longitude ({lon}) is outside DEM bounds [{lon_min:.2f}, {lon_max:.2f}]")
+            raise ValueError(
+                f"{param_name} longitude ({lon}) is outside "
+                f"DEM bounds [{lon_min:.2f}, {lon_max:.2f}]"
+            )
         if not (lat_min <= lat <= lat_max):
-            raise ValueError(f"{param_name} latitude ({lat}) is outside DEM bounds [{lat_min:.2f}, {lat_max:.2f}]")
+            raise ValueError(
+                f"{param_name} latitude ({lat}) is outside "
+                f"DEM bounds [{lat_min:.2f}, {lat_max:.2f}]"
+            )
 
     @staticmethod
-    def _ensure_descending(distances: np.ndarray, elevations: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _ensure_descending(
+        distances: np.ndarray, elevations: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Ensure profile descends from higher to lower elevation values.
 
-        For bathymetry (negative elevations): -100m > -4000m, so profile runs shallow to deep.
+        For bathymetry (negative elevations): -100m > -4000m,
+        so profile runs shallow to deep.
         For topography (positive elevations): 1000m > 100m, so profile runs high to low.
 
         Parameters
@@ -430,7 +480,9 @@ class Profile:
         if num_points is None and point_spacing is None:
             return 100  # Default value
         if num_points is not None and point_spacing is not None:
-            raise ValueError("Cannot specify both num_points and point_spacing. Choose one.")
+            raise ValueError(
+                "Cannot specify both num_points and point_spacing. Choose one."
+            )
 
         # Use num_points if provided
         if num_points is not None:
@@ -461,7 +513,12 @@ class Profile:
         lats = np.linspace(self.start_lat, self.end_lat, self.num_points)
 
         # Extract elevations at each point
-        elevations = np.array([float(self.data.sel(lon=lon, lat=lat, method="nearest").values) for lon, lat in zip(lons, lats)])
+        elevations = np.array(
+            [
+                float(self.data.sel(lon=lon, lat=lat, method="nearest").values)
+                for lon, lat in zip(lons, lats)
+            ]
+        )
 
         # Calculate cumulative distances
         geod = Geodesic.WGS84
@@ -479,7 +536,9 @@ class Profile:
         Returns
         -------
         pl.DataFrame
-            DataFrame with statistics including total_distance, min/max/mean/median/std elevation, and elevation_range
+            DataFrame with statistics including total_distance,
+            min/max/mean/median/std elevation, and
+            elevation_range
         """
         return pl.DataFrame(
             {
@@ -557,7 +616,9 @@ class Profile:
         >>> print(f"NCI: {nci:.3f}")
         """
         # Straight line from start to end
-        reference_line = np.linspace(self.elevations[0], self.elevations[-1], len(self.elevations))
+        reference_line = np.linspace(
+            self.elevations[0], self.elevations[-1], len(self.elevations)
+        )
 
         # Vertical deviations (actual - reference)
         deviations = self.elevations - reference_line
@@ -575,7 +636,9 @@ class Profile:
         # Normalize by relief
         return median_deviation / relief
 
-    def knickpoints(self, threshold: float | None = None, smooth: float | None = None) -> pl.DataFrame:
+    def knickpoints(
+        self, threshold: float | None = None, smooth: float | None = None
+    ) -> pl.DataFrame:
         """
         Identify knickpoints (abrupt slope changes) along the profile.
 
@@ -592,7 +655,9 @@ class Profile:
         pl.DataFrame
             Knickpoints with columns: distance_km, depth_m, slope_break
         """
-        elevations = gaussian_filter1d(self.elevations, smooth) if smooth else self.elevations
+        elevations = (
+            gaussian_filter1d(self.elevations, smooth) if smooth else self.elevations
+        )
         grad = np.gradient(elevations, self.distances * 1000)  # m/m
         slope_deg = np.degrees(np.arctan(np.abs(grad)))
         slope_break = np.abs(np.gradient(slope_deg, self.distances))  # deg/km
@@ -663,14 +728,17 @@ class Profile:
 
         return fig, ax
 
-    def get_canyons(self, prominence: float | None = None, smooth: float | None = None) -> pl.DataFrame:
+    def get_canyons(
+        self, prominence: float | None = None, smooth: float | None = None
+    ) -> pl.DataFrame:
         """
         Identify canyon features in the profile.
 
         Parameters
         ----------
         prominence : float, optional
-            Minimum prominence (m) for canyon detection. If None, uses 10% of elevation range.
+            Minimum prominence (m) for canyon detection.
+            If None, uses 10% of elevation range.
         smooth : float, optional
             Gaussian smoothing sigma before detection. Typical values: 2-5.
 
@@ -684,11 +752,17 @@ class Profile:
         if prominence is not None and prominence <= 0:
             raise ValueError(f"prominence must be positive, got {prominence}")
 
-        elevations = gaussian_filter1d(self.elevations, sigma=smooth) if smooth else self.elevations
+        elevations = (
+            gaussian_filter1d(self.elevations, sigma=smooth)
+            if smooth
+            else self.elevations
+        )
         distances_m = self.distances * 1000  # Work in metres throughout
 
         if prominence is None:
-            prominence = (elevations.max() - elevations.min()) * _DEFAULT_PROMINENCE_FRACTION
+            prominence = (
+                elevations.max() - elevations.min()
+            ) * _DEFAULT_PROMINENCE_FRACTION
 
         peak_idx, _ = find_peaks(elevations, prominence=prominence)
         trough_idx, _ = find_peaks(-elevations, prominence=prominence)
@@ -707,29 +781,44 @@ class Profile:
             if li is not None and ri is not None:
                 lower_elev = min(self.elevations[li], self.elevations[ri])
             else:
-                lower_elev = self.elevations[li] if li is not None else self.elevations[ri]
+                lower_elev = (
+                    self.elevations[li] if li is not None else self.elevations[ri]
+                )
 
             # Find width endpoints at lower shoulder elevation
             if li is not None:
                 width_start = distances_m[li]
             else:
                 mask = np.arange(len(elevations)) < ti
-                width_start = self._find_crossing_m(mask, lower_elev, distances_m, distances_m[0])
+                width_start = self._find_crossing_m(
+                    mask, lower_elev, distances_m, distances_m[0]
+                )
 
             if ri is not None:
                 width_end = distances_m[ri]
             else:
                 mask = np.arange(len(elevations)) > ti
-                width_end = self._find_crossing_m(mask, lower_elev, distances_m, distances_m[-1])
+                width_end = self._find_crossing_m(
+                    mask, lower_elev, distances_m, distances_m[-1]
+                )
 
-            # If one shoulder is higher, find where its elevation crosses the opposite slope
+            # If one shoulder is higher, find where its
+            # elevation crosses the opposite slope
             if li is not None and ri is not None:
                 if self.elevations[li] < self.elevations[ri]:
-                    mask = (np.arange(len(elevations)) > ti) & (np.arange(len(elevations)) <= ri)
-                    width_end = self._find_crossing_m(mask, lower_elev, distances_m, distances_m[ri])
+                    mask = (np.arange(len(elevations)) > ti) & (
+                        np.arange(len(elevations)) <= ri
+                    )
+                    width_end = self._find_crossing_m(
+                        mask, lower_elev, distances_m, distances_m[ri]
+                    )
                 elif self.elevations[ri] < self.elevations[li]:
-                    mask = (np.arange(len(elevations)) >= li) & (np.arange(len(elevations)) < ti)
-                    width_start = self._find_crossing_m(mask, lower_elev, distances_m, distances_m[li])
+                    mask = (np.arange(len(elevations)) >= li) & (
+                        np.arange(len(elevations)) < ti
+                    )
+                    width_start = self._find_crossing_m(
+                        mask, lower_elev, distances_m, distances_m[li]
+                    )
 
             # Cross-sectional area
             area_mask = (distances_m >= width_start) & (distances_m <= width_end)
@@ -763,21 +852,35 @@ class Profile:
 
         return pl.DataFrame(canyons)
 
-    def _find_crossing_m(self, mask: np.ndarray, target_elev: float, distances_m: np.ndarray, fallback: float) -> float:
-        """Find where profile crosses target elevation within masked region (returns metres)."""
+    def _find_crossing_m(
+        self,
+        mask: np.ndarray,
+        target_elev: float,
+        distances_m: np.ndarray,
+        fallback: float,
+    ) -> float:
+        """Find where profile crosses target elevation
+        within masked region (returns metres)."""
         elevs, dists = self.elevations[mask], distances_m[mask]
         if len(elevs) == 0:
             return fallback
         return dists[np.argmin(np.abs(elevs - target_elev))]
 
-    def plot_canyons(self, canyons: pl.DataFrame | None = None, prominence: float | None = None, smooth: float | None = None, **kwargs):
+    def plot_canyons(
+        self,
+        canyons: pl.DataFrame | None = None,
+        prominence: float | None = None,
+        smooth: float | None = None,
+        **kwargs,
+    ):
         """
         Plot profile with canyons marked.
 
         Parameters
         ----------
         canyons : pl.DataFrame, optional
-            Canyon data from get_canyons(). If None, detects canyons using prominence/smooth.
+            Canyon data from get_canyons(). If None, detects
+            canyons using prominence/smooth.
         prominence : float, optional
             Minimum prominence (m) for canyon detection (ignored if canyons provided).
         smooth : float, optional
@@ -810,10 +913,24 @@ class Profile:
             ax.plot(floor_km, floor_elev, "ro", markersize=8, zorder=10)
 
             # Width line at shoulder elevation
-            ax.plot([ws_km, we_km], [shoulder_elev] * 2, "k--", linewidth=1.5, alpha=0.7, zorder=5)
+            ax.plot(
+                [ws_km, we_km],
+                [shoulder_elev] * 2,
+                "k--",
+                linewidth=1.5,
+                alpha=0.7,
+                zorder=5,
+            )
 
             # Depth line
-            ax.plot([floor_km] * 2, [floor_elev, shoulder_elev], "k--", linewidth=1.5, alpha=0.7, zorder=5)
+            ax.plot(
+                [floor_km] * 2,
+                [floor_elev, shoulder_elev],
+                "k--",
+                linewidth=1.5,
+                alpha=0.7,
+                zorder=5,
+            )
 
         return fig, axes
 
@@ -838,15 +955,18 @@ class Profile:
         normalize : bool
             If True, normalize elevation to 0-1 range
         ensure_descending : bool
-            If True, orient profile to descend from higher to lower elevation (ignoring user-defined start/end).
-            If False (default), distance axis starts at the user-defined start point.
+            If True, orient profile to descend from higher
+            to lower elevation (ignoring user-defined
+            start/end). If False (default), distance axis
+            starts at the user-defined start point.
         **kwargs
             Additional arguments passed to matplotlib plot()
 
         Returns
         -------
         Figure, list[Axes]
-            Matplotlib figure and list of axes (2 axes if show_map=True, 1 axis otherwise)
+            Matplotlib figure and list of axes
+            (2 axes if show_map=True, 1 axis otherwise)
 
         Examples
         --------
@@ -856,7 +976,11 @@ class Profile:
         >>> fig, axes = prof.plot(normalize=True)
         """
         # Apply smoothing
-        elevations = gaussian_filter1d(self.elevations, sigma=smooth) if smooth else self.elevations
+        elevations = (
+            gaussian_filter1d(self.elevations, sigma=smooth)
+            if smooth
+            else self.elevations
+        )
         distances = self.distances.copy()
 
         # Optionally ensure profile descends from higher to lower elevation
@@ -882,9 +1006,23 @@ class Profile:
 
             # Plot map
             extent = get_extent(self.data)
-            ax_map.imshow(self.data.values, cmap=cmap, origin="lower", extent=extent, aspect="auto")
-            ax_map.plot([self.start_lon, self.end_lon], [self.start_lat, self.end_lat], "r-", linewidth=2, label="Profile line")
-            ax_map.plot(self.start_lon, self.start_lat, "go", markersize=10, label="Start")
+            ax_map.imshow(
+                self.data.values,
+                cmap=cmap,
+                origin="lower",
+                extent=extent,
+                aspect="auto",
+            )
+            ax_map.plot(
+                [self.start_lon, self.end_lon],
+                [self.start_lat, self.end_lat],
+                "r-",
+                linewidth=2,
+                label="Profile line",
+            )
+            ax_map.plot(
+                self.start_lon, self.start_lat, "go", markersize=10, label="Start"
+            )
             ax_map.plot(self.end_lon, self.end_lat, "ro", markersize=10, label="End")
             ax_map.set_xlabel("Longitude (°)")
             ax_map.set_ylabel("Latitude (°)")
@@ -976,15 +1114,18 @@ def plot_profiles(
     normalize : bool
         If True, normalize each profile's elevation and distance to 0-1
     ensure_descending : bool
-        If True, orient profiles to descend from higher to lower elevation (ignoring user-defined start/end).
-        If False (default), distance axis starts at the user-defined start point.
+        If True, orient profiles to descend from higher
+        to lower elevation (ignoring user-defined
+        start/end). If False (default), distance axis
+        starts at the user-defined start point.
     **kwargs
         Additional arguments passed to matplotlib plot()
 
     Returns
     -------
     Figure, list[Axes]
-        Matplotlib figure and list of axes (2 axes if show_map=True, 1 axis otherwise)
+        Matplotlib figure and list of axes
+        (2 axes if show_map=True, 1 axis otherwise)
 
     Examples
     --------
@@ -1011,11 +1152,24 @@ def plot_profiles(
         # Plot map with profile lines
         bathymetry_data = profiles[0].data
         extent = get_extent(bathymetry_data)
-        ax_map.imshow(bathymetry_data.values, cmap=cmap, origin="lower", extent=extent, aspect="auto", alpha=0.6)
+        ax_map.imshow(
+            bathymetry_data.values,
+            cmap=cmap,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            alpha=0.6,
+        )
 
         for i, prof in enumerate(profiles, start=1):
             label = prof.name if prof.name else f"Profile {i}"
-            ax_map.plot([prof.start_lon, prof.end_lon], [prof.start_lat, prof.end_lat], "-", linewidth=2, label=label)
+            ax_map.plot(
+                [prof.start_lon, prof.end_lon],
+                [prof.start_lat, prof.end_lat],
+                "-",
+                linewidth=2,
+                label=label,
+            )
             ax_map.plot(prof.start_lon, prof.start_lat, "o", markersize=6)
             ax_map.plot(prof.end_lon, prof.end_lat, "s", markersize=6)
 
@@ -1086,8 +1240,10 @@ def plot_profiles_grid(
     normalize : bool
         If True, normalize each profile's elevation and distance to 0-1
     ensure_descending : bool
-        If True, orient profiles to descend from higher to lower elevation (ignoring user-defined start/end).
-        If False (default), distance axis starts at the user-defined start point.
+        If True, orient profiles to descend from higher
+        to lower elevation (ignoring user-defined
+        start/end). If False (default), distance axis
+        starts at the user-defined start point.
     **kwargs
         Additional arguments passed to matplotlib plot()
 
@@ -1105,7 +1261,9 @@ def plot_profiles_grid(
     >>> plot_profiles_grid(profiles[:10], smooth=3.0)
     >>> # With cross-sections and main profile
     >>> main = bath.profile(start=(-9.5, 52.0), end=(-5.5, 54.0))
-    >>> sections = Profile.cross_sections(bath.data, main, interval_km=20, section_width_km=30)
+    >>> sections = Profile.cross_sections(
+    ...     bath.data, main, interval_km=20, section_width_km=30
+    ... )
     >>> plot_profiles_grid(sections, main_profile=main)
     """
     # Handle single profile
@@ -1131,7 +1289,11 @@ def plot_profiles_grid(
         ax = axes[i]
 
         # Apply smoothing
-        elevations = gaussian_filter1d(prof.elevations, sigma=smooth) if smooth else prof.elevations.copy()
+        elevations = (
+            gaussian_filter1d(prof.elevations, sigma=smooth)
+            if smooth
+            else prof.elevations.copy()
+        )
         distances = prof.distances.copy()
 
         # Optionally ensure profile descends from higher to lower elevation
@@ -1161,7 +1323,14 @@ def plot_profiles_grid(
         if main_profile is not None:
             # For cross-sections, the main profile intersects at the midpoint
             mid_distance = distances[len(distances) // 2]
-            ax.axvline(mid_distance, color="black", linestyle="-", linewidth=1.5, alpha=0.7, zorder=10)
+            ax.axvline(
+                mid_distance,
+                color="black",
+                linestyle="-",
+                linewidth=1.5,
+                alpha=0.7,
+                zorder=10,
+            )
 
         ax.set_xlabel("Normalized distance" if normalize else "Distance (km)")
         ax.set_ylabel("Normalized elevation" if normalize else "Elevation (m)")
@@ -1180,7 +1349,11 @@ def plot_profiles_grid(
 
 
 def plot_profiles_map(
-    profiles: Profile | list[Profile], bathymetry_data=None, main_profile: Profile | None = None, cmap=cmo.deep_r, **kwargs
+    profiles: Profile | list[Profile],
+    bathymetry_data=None,
+    main_profile: Profile | None = None,
+    cmap=cmo.deep_r,
+    **kwargs,
 ):
     """
     Plot profile locations on a map.
@@ -1192,7 +1365,8 @@ def plot_profiles_map(
     bathymetry_data : xr.DataArray, optional
         Bathymetry data to plot as background. If None, uses data from first profile.
     main_profile : Profile, optional
-        Optional main profile to highlight (e.g., when showing cross-sections along a main profile)
+        Optional main profile to highlight (e.g., when
+        showing cross-sections along a main profile)
     **kwargs
         Additional arguments passed to matplotlib plot()
 
@@ -1211,7 +1385,9 @@ def plot_profiles_map(
     >>> plot_profiles_map(prof1)
     >>> # With cross-sections
     >>> main = bath.profile(-9.5, 52.0, -5.5, 54.0)
-    >>> sections = Profile.cross_sections(bath.data, main, interval_km=10, section_width_km=20)
+    >>> sections = Profile.cross_sections(
+    ...     bath.data, main, interval_km=10, section_width_km=20
+    ... )
     >>> plot_profiles_map(sections, main_profile=main)
     """
     # Handle single profile
@@ -1230,7 +1406,14 @@ def plot_profiles_map(
 
     if bathymetry_data is not None:
         extent = get_extent(bathymetry_data)
-        ax.imshow(bathymetry_data.values, cmap=cmap, origin="lower", extent=extent, aspect="auto", alpha=0.6)
+        ax.imshow(
+            bathymetry_data.values,
+            cmap=cmap,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            alpha=0.6,
+        )
 
     # Plot each profile line
     for i, prof in enumerate(profiles, start=1):
@@ -1245,7 +1428,14 @@ def plot_profiles_map(
             ax.plot(lons[-1], lats[-1], "s", markersize=8)
         else:
             # Simple straight line profile
-            ax.plot([prof.start_lon, prof.end_lon], [prof.start_lat, prof.end_lat], "-", linewidth=2, label=label, **kwargs)
+            ax.plot(
+                [prof.start_lon, prof.end_lon],
+                [prof.start_lat, prof.end_lat],
+                "-",
+                linewidth=2,
+                label=label,
+                **kwargs,
+            )
             ax.plot(prof.start_lon, prof.start_lat, "o", markersize=8)
             ax.plot(prof.end_lon, prof.end_lat, "s", markersize=8)
 
@@ -1260,8 +1450,22 @@ def plot_profiles_map(
             label=main_label,
             zorder=10,
         )
-        ax.plot(main_profile.start_lon, main_profile.start_lat, "go", markersize=10, zorder=11, label="Start")
-        ax.plot(main_profile.end_lon, main_profile.end_lat, "rs", markersize=10, zorder=11, label="End")
+        ax.plot(
+            main_profile.start_lon,
+            main_profile.start_lat,
+            "go",
+            markersize=10,
+            zorder=11,
+            label="Start",
+        )
+        ax.plot(
+            main_profile.end_lon,
+            main_profile.end_lat,
+            "rs",
+            markersize=10,
+            zorder=11,
+            label="End",
+        )
 
     ax.set_xlabel("Longitude (°)")
     ax.set_ylabel("Latitude (°)")

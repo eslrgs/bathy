@@ -108,7 +108,11 @@ def _get_region(name: str) -> tuple[float, float, float, float]:
     """
     if name not in REGIONS:
         available = ", ".join(list_regions()[:5])
-        raise ValueError(f"Region '{name}' not found. Available: {available}, ... (see bathy.list_regions())")
+        raise ValueError(
+            f"Region '{name}' not found. "
+            f"Available: {available}, ... "
+            f"(see bathy.list_regions())"
+        )
     return REGIONS[name]
 
 
@@ -167,16 +171,22 @@ class Bathymetry:
         # Handle region parameter
         if region is not None:
             if lon_range is not None or lat_range is not None:
-                raise ValueError("Cannot specify both 'region' and 'lon_range'/'lat_range'. Use one or the other.")
+                raise ValueError(
+                    "Cannot specify both 'region' and 'lon_range'/'lat_range'."
+                )
             lon_min, lon_max, lat_min, lat_max = _get_region(region)
             lon_range = (lon_min, lon_max)
             lat_range = (lat_min, lat_max)
 
         # Validate range inputs
         if lon_range is not None and len(lon_range) != 2:
-            raise ValueError(f"lon_range must be a 2-tuple, got {len(lon_range)} elements")
+            raise ValueError(
+                f"lon_range must be a 2-tuple, got {len(lon_range)} elements"
+            )
         if lat_range is not None and len(lat_range) != 2:
-            raise ValueError(f"lat_range must be a 2-tuple, got {len(lat_range)} elements")
+            raise ValueError(
+                f"lat_range must be a 2-tuple, got {len(lat_range)} elements"
+            )
 
         # Load data using internal method
         self.data = self._load_data(lon_range, lat_range, var_name, lon_name, lat_name)
@@ -213,9 +223,11 @@ class Bathymetry:
         Parameters
         ----------
         lon_range : tuple[float, float], optional
-            Longitude bounds (min, max), range: -180 to 180. Cannot be used with 'region'.
+            Longitude bounds (min, max), range: -180 to 180.
+            Cannot be used with 'region'.
         lat_range : tuple[float, float], optional
-            Latitude bounds (min, max), range: -90 to 90. Cannot be used with 'region'.
+            Latitude bounds (min, max), range: -90 to 90.
+            Cannot be used with 'region'.
         region : str, optional
             Preset region name (e.g., 'mediterranean', 'mariana_trench').
             See `bathy.list_regions()` for available regions.
@@ -253,14 +265,18 @@ class Bathymetry:
         # Handle region parameter
         if region is not None:
             if lon_range is not None or lat_range is not None:
-                raise ValueError("Cannot specify both 'region' and 'lon_range'/'lat_range'. Use one or the other.")
+                raise ValueError(
+                    "Cannot specify both 'region' and 'lon_range'/'lat_range'."
+                )
             lon_min, lon_max, lat_min, lat_max = _get_region(region)
             lon_range = (lon_min, lon_max)
             lat_range = (lat_min, lat_max)
 
         # Validate that we have ranges
         if lon_range is None or lat_range is None:
-            raise ValueError("Must specify either 'region' or both 'lon_range' and 'lat_range'")
+            raise ValueError(
+                "Must specify either 'region' or both 'lon_range' and 'lat_range'"
+            )
 
         if save_path and os.path.exists(save_path):
             logger.info(f"Using existing file: {save_path}")
@@ -291,7 +307,10 @@ class Bathymetry:
         >>> import numpy as np
         >>> data = xr.DataArray(
         ...     np.random.rand(10, 10) * -100,
-        ...     coords={"lon": np.linspace(-10, -5, 10), "lat": np.linspace(50, 55, 10)},
+        ...     coords={
+        ...         "lon": np.linspace(-10, -5, 10),
+        ...         "lat": np.linspace(50, 55, 10),
+        ...     },
         ...     dims=["lat", "lon"],
         ... )
         >>> bath = Bathymetry.from_array(data)
@@ -351,14 +370,21 @@ class Bathymetry:
         base_url = f"https://dap.ceda.ac.uk/thredds/ncss/bodc/gebco/global/gebco_{year}/ice_surface_elevation/netcdf/GEBCO_{year}.nc"
         ncss_url = f"{base_url}?{urlencode(params)}"
 
-        filepath = save_path or tempfile.NamedTemporaryFile(delete=False, suffix=".nc").name
+        filepath = (
+            save_path or tempfile.NamedTemporaryFile(delete=False, suffix=".nc").name
+        )
 
         logger.info(f"Downloading GEBCO {year} data from CEDA...")
 
         response = urlopen(ncss_url)
         total = int(response.headers.get("Content-Length", 0))
 
-        with open(filepath, "wb") as f, tqdm(total=total, unit="B", unit_scale=True, desc="Downloading GEBCO") as pbar:
+        with (
+            open(filepath, "wb") as f,
+            tqdm(
+                total=total, unit="B", unit_scale=True, desc="Downloading GEBCO"
+            ) as pbar,
+        ):
             while chunk := response.read(8192):
                 f.write(chunk)
                 pbar.update(len(chunk))
@@ -465,11 +491,19 @@ class Bathymetry:
 
         # Check if specified names exist
         if lon_name not in ds.coords and lon_name not in ds.dims:
-            raise ValueError(f"Longitude coordinate '{lon_name}' not found. Available: {list(ds.coords)}")
+            raise ValueError(
+                f"Longitude coordinate '{lon_name}' not found. "
+                f"Available: {list(ds.coords)}"
+            )
         if lat_name not in ds.coords and lat_name not in ds.dims:
-            raise ValueError(f"Latitude coordinate '{lat_name}' not found. Available: {list(ds.coords)}")
+            raise ValueError(
+                f"Latitude coordinate '{lat_name}' not found. "
+                f"Available: {list(ds.coords)}"
+            )
         if var_name not in ds.data_vars:
-            raise ValueError(f"Variable '{var_name}' not found. Available: {list(ds.data_vars)}")
+            raise ValueError(
+                f"Variable '{var_name}' not found. Available: {list(ds.data_vars)}"
+            )
 
         # Store original bounds before selection for error messages
         original_lon_bounds = (float(ds[lon_name].min()), float(ds[lon_name].max()))
@@ -504,7 +538,15 @@ class Bathymetry:
 
     def _add_contours(self, ax: "Axes", contours: int | list[float], **kwargs) -> None:
         """Add contour lines to an existing axes."""
-        cs = self.data.plot.contour(ax=ax, levels=contours, colors="black", alpha=0.8, linewidths=1, linestyles="-", **kwargs)
+        cs = self.data.plot.contour(
+            ax=ax,
+            levels=contours,
+            colors="black",
+            alpha=0.8,
+            linewidths=1,
+            linestyles="-",
+            **kwargs,
+        )
         ax.clabel(cs, inline=True, fontsize=8)
 
     @staticmethod
@@ -555,14 +597,26 @@ class Bathymetry:
         if not len(underwater):
             return pl.DataFrame(
                 {
-                    "statistic": ["min_depth", "max_depth", "mean_depth", "median_depth", "std_depth"],
+                    "statistic": [
+                        "min_depth",
+                        "max_depth",
+                        "mean_depth",
+                        "median_depth",
+                        "std_depth",
+                    ],
                     "value": [np.nan, np.nan, np.nan, np.nan, np.nan],
                 }
             )
 
         return pl.DataFrame(
             {
-                "statistic": ["min_depth", "max_depth", "mean_depth", "median_depth", "std_depth"],
+                "statistic": [
+                    "min_depth",
+                    "max_depth",
+                    "mean_depth",
+                    "median_depth",
+                    "std_depth",
+                ],
                 "value": [
                     float(np.min(underwater)),
                     float(np.max(underwater)),
@@ -588,7 +642,13 @@ class Bathymetry:
 
         return pl.DataFrame(
             {
-                "metric": ["total_cells", "underwater_cells", "land_cells", "underwater_pct", "land_pct"],
+                "metric": [
+                    "total_cells",
+                    "underwater_cells",
+                    "land_cells",
+                    "underwater_pct",
+                    "land_pct",
+                ],
                 "value": [
                     float(total),
                     float(underwater),
@@ -712,8 +772,12 @@ class Bathymetry:
         lon_centre = float(self.data.lon.mean())
 
         geod = Geodesic.WGS84
-        dy = geod.Inverse(lat_centre, lon_centre, lat_centre + lat_spacing, lon_centre)["s12"]
-        dx = geod.Inverse(lat_centre, lon_centre, lat_centre, lon_centre + lon_spacing)["s12"]
+        dy = geod.Inverse(lat_centre, lon_centre, lat_centre + lat_spacing, lon_centre)[
+            "s12"
+        ]
+        dx = geod.Inverse(lat_centre, lon_centre, lat_centre, lon_centre + lon_spacing)[
+            "s12"
+        ]
         return dy, dx
 
     def slope(self) -> xr.DataArray:
@@ -728,7 +792,9 @@ class Bathymetry:
         dy, dx = self._cell_size_metres()
         gy, gx = np.gradient(self.data.values, dy, dx)
         slope_deg = np.degrees(np.arctan(np.sqrt(gx**2 + gy**2)))
-        return xr.DataArray(slope_deg, coords=self.data.coords, dims=self.data.dims, name="slope")
+        return xr.DataArray(
+            slope_deg, coords=self.data.coords, dims=self.data.dims, name="slope"
+        )
 
     def curvature(self) -> xr.DataArray:
         """
@@ -743,7 +809,9 @@ class Bathymetry:
         gy, gx = np.gradient(self.data.values, dy, dx)
         gyy, _ = np.gradient(gy, dy, dx)
         _, gxx = np.gradient(gx, dy, dx)
-        return xr.DataArray(gxx + gyy, coords=self.data.coords, dims=self.data.dims, name="curvature")
+        return xr.DataArray(
+            gxx + gyy, coords=self.data.coords, dims=self.data.dims, name="curvature"
+        )
 
     def bpi(self, radius_km: float = 1.0) -> xr.DataArray:
         """
@@ -776,10 +844,14 @@ class Bathymetry:
         window_size = max(3, int(2 * radius_km * 1000 / cell_size) + 1)
 
         # Calculate neighbourhood mean using fast uniform filter
-        neighbourhood_mean = uniform_filter(self.data.values.astype(float), size=window_size, mode="nearest")
+        neighbourhood_mean = uniform_filter(
+            self.data.values.astype(float), size=window_size, mode="nearest"
+        )
         bpi_values = self.data.values - neighbourhood_mean
 
-        return xr.DataArray(bpi_values, coords=self.data.coords, dims=self.data.dims, name="bpi")
+        return xr.DataArray(
+            bpi_values, coords=self.data.coords, dims=self.data.dims, name="bpi"
+        )
 
     # Profile and Swath methods
 
@@ -827,11 +899,22 @@ class Bathymetry:
 
         start_lon, start_lat = start
         end_lon, end_lat = end
-        return Profile(self.data, start_lon, start_lat, end_lon, end_lat, num_points, point_spacing, name)
+        return Profile(
+            self.data,
+            start_lon,
+            start_lat,
+            end_lon,
+            end_lat,
+            num_points,
+            point_spacing,
+            name,
+        )
 
     # Plotting methods
 
-    def plot_bathy(self, contours: int | list[float] | None = None, cmap=None, **kwargs) -> None:
+    def plot_bathy(
+        self, contours: int | list[float] | None = None, cmap=None, **kwargs
+    ) -> None:
         """
         Plot bathymetry elevation.
 
@@ -842,8 +925,8 @@ class Bathymetry:
             If list, specific contour levels (in meters)
             If None, no contours are plotted
         cmap : str or Colormap, optional
-            Colormap to use. Defaults to cmocean 'deep_r' (reversed, perceptually uniform,
-            colorblind-friendly bathymetry colormap with light=shallow, dark=deep)
+            Colormap to use. Defaults to cmocean 'deep_r'
+            (light=shallow, dark=deep)
         **kwargs
             Additional arguments passed to xarray plot
         """
@@ -868,7 +951,13 @@ class Bathymetry:
         ax.set_ylabel("Latitude (°)")
         plt.show()
 
-    def plot_hillshade(self, azimuth: float = 315, altitude: float = 45, contours: int | list[float] | None = None, **kwargs) -> None:
+    def plot_hillshade(
+        self,
+        azimuth: float = 315,
+        altitude: float = 45,
+        contours: int | list[float] | None = None,
+        **kwargs,
+    ) -> None:
         """
         Create hillshade visualisation.
 
@@ -890,7 +979,9 @@ class Bathymetry:
         extent = get_extent(self.data)
 
         fig, ax = plt.subplots(figsize=(10, 8))
-        ax.imshow(shaded, cmap="gray", origin="lower", extent=extent, aspect="auto", **kwargs)
+        ax.imshow(
+            shaded, cmap="gray", origin="lower", extent=extent, aspect="auto", **kwargs
+        )
 
         if contours is not None:
             self._add_contours(ax, contours)
@@ -899,7 +990,12 @@ class Bathymetry:
         ax.set_ylabel("Latitude (°)")
         plt.show()
 
-    def plot_slope(self, contours: int | list[float] | None = None, vmax: float | None = None, **kwargs) -> None:
+    def plot_slope(
+        self,
+        contours: int | list[float] | None = None,
+        vmax: float | None = None,
+        **kwargs,
+    ) -> None:
         """
         Plot seafloor slope.
 
@@ -942,7 +1038,9 @@ class Bathymetry:
         ax.set_ylabel("Latitude (°)")
         plt.show()
 
-    def plot_curvature(self, contours: int | list[float] | None = None, **kwargs) -> None:
+    def plot_curvature(
+        self, contours: int | list[float] | None = None, **kwargs
+    ) -> None:
         """
         Plot seafloor curvature.
 
@@ -990,7 +1088,12 @@ class Bathymetry:
         ax.set_ylabel("Latitude (°)")
         plt.show()
 
-    def plot_bpi(self, radius_km: float = 1.0, contours: int | list[float] | None = None, **kwargs) -> None:
+    def plot_bpi(
+        self,
+        radius_km: float = 1.0,
+        contours: int | list[float] | None = None,
+        **kwargs,
+    ) -> None:
         """
         Plot Bathymetric Position Index (BPI).
 
@@ -1092,7 +1195,15 @@ class Bathymetry:
         extent = get_extent(self.data)
 
         fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(self.data.values, cmap=colors, norm=norm, origin="lower", extent=extent, aspect="auto", **kwargs)
+        im = ax.imshow(
+            self.data.values,
+            cmap=colors,
+            norm=norm,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            **kwargs,
+        )
 
         if contours is not None:
             self._add_contours(ax, contours)
@@ -1100,8 +1211,14 @@ class Bathymetry:
         cbar = plt.colorbar(im, ax=ax, label="Depth zone")
 
         # Set ticks at the center of each color band with depth range labels
-        tick_positions = [(boundaries[i] + boundaries[i + 1]) / 2 for i in range(n_zones)]
-        tick_labels = [f"{reversed_labels[i]}\n({int(boundaries[i + 1])} to {int(boundaries[i])} m)" for i in range(n_zones)]
+        tick_positions = [
+            (boundaries[i] + boundaries[i + 1]) / 2 for i in range(n_zones)
+        ]
+        tick_labels = [
+            f"{reversed_labels[i]}\n"
+            f"({int(boundaries[i + 1])} to {int(boundaries[i])} m)"
+            for i in range(n_zones)
+        ]
         cbar.set_ticks(tick_positions)
         cbar.set_ticklabels(tick_labels)
 
@@ -1153,13 +1270,27 @@ class Bathymetry:
 
         lon_grid, lat_grid = np.meshgrid(lon, lat)
 
-        surf = ax.plot_surface(lon_grid, lat_grid, z, cmap=cmo.deep_r, linewidth=0, antialiased=True, **kwargs)
+        surf = ax.plot_surface(
+            lon_grid,
+            lat_grid,
+            z,
+            cmap=cmo.deep_r,
+            linewidth=0,
+            antialiased=True,
+            **kwargs,
+        )
         fig.colorbar(surf, ax=ax, label="Elevation (m)", shrink=0.5, pad=0.1)
 
         # Set aspect ratio accounting for longitude compression at higher latitudes
         lat_centre = float(self.data.lat.mean())
         lon_scale = np.cos(np.radians(lat_centre))
-        ax.set_box_aspect([np.ptp(lon) * lon_scale, np.ptp(lat), np.ptp(z) * vertical_exaggeration / 1000])
+        ax.set_box_aspect(
+            [
+                np.ptp(lon) * lon_scale,
+                np.ptp(lat),
+                np.ptp(z) * vertical_exaggeration / 1000,
+            ]
+        )
 
         ax.view_init(elev=elev, azim=azim)
         ax.set_xlabel("Longitude (°)")
@@ -1172,4 +1303,8 @@ class Bathymetry:
         """String representation."""
         lon_min, lon_max = self.lon_range
         lat_min, lat_max = self.lat_range
-        return f"Bathymetry(shape={self.shape}, lon=[{lon_min:.2f}, {lon_max:.2f}], lat=[{lat_min:.2f}, {lat_max:.2f}])"
+        return (
+            f"Bathymetry(shape={self.shape}, "
+            f"lon=[{lon_min:.2f}, {lon_max:.2f}], "
+            f"lat=[{lat_min:.2f}, {lat_max:.2f}])"
+        )
