@@ -61,6 +61,17 @@ bath.plot_bpi(radius_km=2.0)
 
 BPI identifies ridges (positive) and valleys (negative) relative to the surrounding terrain. The `radius_km` parameter controls the neighbourhood size.
 
+### Rugosity
+
+```python
+bath.plot_rugosity(radius_km=1.0)
+
+# Clip extreme values
+bath.plot_rugosity(vmax=0.05)
+```
+
+Rugosity (Vector Ruggedness Measure) quantifies terrain complexity. Values range from 0 (flat) to 1 (maximally rough). Higher values indicate structurally complex seabed — useful for identifying hard substrate and reef habitat. The `radius_km` parameter controls the neighbourhood size.
+
 ## Depth zones
 
 Classify bathymetry into depth zones:

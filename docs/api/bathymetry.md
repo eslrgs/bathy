@@ -15,6 +15,7 @@
         - slope
         - curvature
         - bpi
+        - rugosity
         - hypsometric_index
         - hypsometric_curve
         - profile
@@ -23,6 +24,7 @@
         - plot_slope
         - plot_curvature
         - plot_bpi
+        - plot_rugosity
         - plot_histogram
         - plot_depth_zones
         - plot_hypsometric_curve

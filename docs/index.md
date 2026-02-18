@@ -8,7 +8,7 @@ bathy provides tools for loading, analysing, and visualising bathymetric (ocean 
 
 - **Data loading**: Load from NetCDF, GeoTIFF, or download directly from GEBCO
 - **Profile analysis**: Extract and analyse bathymetric profiles with canyon detection and knickpoint identification
-- **Terrain analysis**: Calculate slope, curvature, and hypsometric indices
+- **Terrain analysis**: Calculate slope, curvature, BPI, rugosity, and hypsometric indices
 - **Visualisation**: Publication-ready plots including hillshade, depth zones, and 3D surfaces
 
 ## Quick example

@@ -177,6 +177,58 @@ def test_bpi_valley_is_negative():
     assert bpi.values[10, 10] < 0
 
 
+def test_rugosity_calculation(fake_bathy):
+    """Calculate Vector Ruggedness Measure."""
+    rug = fake_bathy.rugosity(radius_km=1.0)
+
+    assert rug.shape == fake_bathy.shape
+    assert rug.name == "rugosity"
+
+
+def test_rugosity_range(fake_bathy):
+    """VRM values should be in [0, 1]."""
+    rug = fake_bathy.rugosity(radius_km=1.0)
+
+    assert rug.values.min() >= 0
+    assert rug.values.max() <= 1
+
+
+def test_rugosity_flat_surface_is_zero(flat_bathy):
+    """Flat surface should have VRM ≈ 0 everywhere."""
+    rug = flat_bathy.rugosity(radius_km=1.0)
+
+    assert np.allclose(rug.values, 0, atol=1e-10)
+
+
+def test_rugosity_tilted_plane_is_zero():
+    """Uniformly sloping surface should have VRM ≈ 0 (all normals parallel)."""
+    # Linear ramp: high slope, but all surface normals point the same direction
+    x = np.linspace(0, 20, 30)
+    y = np.linspace(0, 20, 30)
+    xx, _ = np.meshgrid(x, y)
+    ramp = xr.DataArray(
+        -xx * 50.0,  # 50 m/cell slope in x direction
+        coords={"lon": np.linspace(-10, -5, 30), "lat": np.linspace(50, 55, 30)},
+        dims=["lat", "lon"],
+    )
+    bath = Bathymetry.from_array(ramp)
+
+    assert np.allclose(bath.rugosity().values, 0, atol=1e-6)
+
+
+def test_rugosity_rough_exceeds_flat(flat_bathy):
+    """Rough terrain should have higher mean VRM than flat terrain."""
+    rng = np.random.default_rng(0)
+    rough_data = xr.DataArray(
+        rng.uniform(-1000, 0, (20, 20)),
+        coords={"lon": np.linspace(-10, -5, 20), "lat": np.linspace(50, 55, 20)},
+        dims=["lat", "lon"],
+    )
+    rough = Bathymetry.from_array(rough_data)
+
+    assert rough.rugosity().values.mean() > flat_bathy.rugosity().values.mean()
+
+
 def test_clip(fake_bathy):
     """Clip returns a Bathymetry object bounded by the requested range."""
     clipped = fake_bathy.clip(lon_range=(-9, -7), lat_range=(51, 54))

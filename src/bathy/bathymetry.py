@@ -853,6 +853,61 @@ class Bathymetry:
             bpi_values, coords=self.data.coords, dims=self.data.dims, name="bpi"
         )
 
+    def rugosity(self, radius_km: float = 1.0) -> xr.DataArray:
+        """
+        Calculate Vector Ruggedness Measure (VRM).
+
+        VRM measures terrain complexity by decomposing the surface into unit
+        normal vectors and quantifying their dispersion within a neighbourhood.
+        Values range from 0 (flat) to 1 (maximally rough).
+
+        Parameters
+        ----------
+        radius_km : float, default 1.0
+            Radius of the neighbourhood in kilometres
+
+        Returns
+        -------
+        xr.DataArray
+            VRM values in range [0, 1]
+
+        References
+        ----------
+        Sappington, J.M., Longshore, K.M., and Thompson, D.B. (2007).
+        Quantifying landscape ruggedness for animal habitat analysis: a case
+        study using bighorn sheep in the Mojave Desert. Journal of Wildlife
+        Management, 71(5), 1419–1426.
+
+        Examples
+        --------
+        >>> rug = bath.rugosity(radius_km=0.5)
+        >>> bath.plot_rugosity()
+        """
+        from scipy.ndimage import uniform_filter  # noqa: PLC0415
+
+        dy, dx = self._cell_size_metres()
+        gy, gx = np.gradient(self.data.values, dy, dx)
+
+        slope = np.arctan(np.sqrt(gx**2 + gy**2))
+        aspect = np.arctan2(gy, gx)
+
+        x = np.sin(slope) * np.sin(aspect)
+        y = np.sin(slope) * np.cos(aspect)
+        z = np.cos(slope)
+
+        cell_size = (dy + dx) / 2
+        window_size = max(3, int(2 * radius_km * 1000 / cell_size) + 1)
+
+        x_mean = uniform_filter(x, size=window_size, mode="nearest")
+        y_mean = uniform_filter(y, size=window_size, mode="nearest")
+        z_mean = uniform_filter(z, size=window_size, mode="nearest")
+
+        vrm = 1.0 - np.sqrt(x_mean**2 + y_mean**2 + z_mean**2)
+
+        return xr.DataArray(
+            vrm, coords=self.data.coords, dims=self.data.dims, name="rugosity"
+        )
+
     # Profile and Swath methods
 
     def profile(
@@ -1125,6 +1180,56 @@ class Bathymetry:
             **kwargs,
         )
         plt.colorbar(im, ax=ax, label=f"BPI (r={radius_km} km)")
+
+        if contours is not None:
+            self._add_contours(ax, contours)
+
+        ax.set_xlabel("Longitude (°)")
+        ax.set_ylabel("Latitude (°)")
+        plt.show()
+
+    def plot_rugosity(
+        self,
+        radius_km: float = 1.0,
+        contours: int | list[float] | None = None,
+        vmax: float | None = None,
+        **kwargs,
+    ) -> None:
+        """
+        Plot Vector Ruggedness Measure (VRM).
+
+        Parameters
+        ----------
+        radius_km : float, default 1.0
+            Radius of the neighbourhood in kilometres
+        contours : int or list[float], optional
+            If int, number of contour levels to plot
+            If list, specific contour levels (in metres)
+            If None, no contours are plotted
+        vmax : float, optional
+            Maximum VRM value for colour scale.
+            Defaults to the 99th percentile to avoid outliers dominating.
+        **kwargs
+            Additional arguments passed to imshow
+        """
+        rug_data = self.rugosity(radius_km)
+        extent = get_extent(self.data)
+
+        if vmax is None:
+            vmax = float(np.nanpercentile(rug_data.values, 99))
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        im = ax.imshow(
+            rug_data.values,
+            cmap=cmo.amp,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            vmin=0,
+            vmax=vmax,
+            **kwargs,
+        )
+        plt.colorbar(im, ax=ax, label=f"Rugosity VRM (r={radius_km} km)")
 
         if contours is not None:
             self._add_contours(ax, contours)
