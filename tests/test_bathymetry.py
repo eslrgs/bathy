@@ -229,6 +229,61 @@ def test_rugosity_rough_exceeds_flat(flat_bathy):
     assert rough.rugosity().values.mean() > flat_bathy.rugosity().values.mean()
 
 
+def test_aspect_calculation(fake_bathy):
+    """Calculate seafloor aspect."""
+    asp = fake_bathy.aspect()
+
+    assert asp.shape == fake_bathy.shape
+    assert asp.name == "aspect"
+
+
+def test_aspect_range(fake_bathy):
+    """Aspect values should be in [0, 360)."""
+    asp = fake_bathy.aspect()
+    valid = asp.values[~np.isnan(asp.values)]
+
+    assert valid.min() >= 0
+    assert valid.max() < 360
+
+
+def test_aspect_flat_surface_is_nan(flat_bathy):
+    """Flat surface (zero gradient) should return NaN everywhere."""
+    asp = flat_bathy.aspect()
+
+    assert np.all(np.isnan(asp.values))
+
+
+def test_aspect_north_facing():
+    """Surface ascending northward should have aspect = 0°."""
+    lats = np.linspace(50, 55, 20)
+    # Elevation increases with latitude (northward ascent)
+    elevations = np.outer(np.linspace(-1000, -500, 20), np.ones(20))
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 20), "lat": lats},
+        dims=["lat", "lon"],
+    )
+    asp = Bathymetry.from_array(data).aspect()
+
+    # Interior points should be north-facing (0°)
+    assert np.allclose(asp.values[1:-1, 1:-1], 0, atol=1e-6)
+
+
+def test_aspect_east_facing():
+    """Surface ascending eastward should have aspect = 90°."""
+    # Elevation increases with longitude (eastward ascent)
+    elevations = np.outer(np.ones(20), np.linspace(-1000, -500, 20))
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 20), "lat": np.linspace(50, 55, 20)},
+        dims=["lat", "lon"],
+    )
+    asp = Bathymetry.from_array(data).aspect()
+
+    # Interior points should be east-facing (90°)
+    assert np.allclose(asp.values[1:-1, 1:-1], 90, atol=1e-6)
+
+
 def test_clip(fake_bathy):
     """Clip returns a Bathymetry object bounded by the requested range."""
     clipped = fake_bathy.clip(lon_range=(-9, -7), lat_range=(51, 54))

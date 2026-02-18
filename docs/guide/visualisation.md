@@ -61,6 +61,14 @@ bath.plot_bpi(radius_km=2.0)
 
 BPI identifies ridges (positive) and valleys (negative) relative to the surrounding terrain. The `radius_km` parameter controls the neighbourhood size.
 
+### Aspect
+
+```python
+bath.plot_aspect()
+```
+
+Aspect is the compass direction of the steepest upslope gradient (0° = north, 90° = east, 180° = south, 270° = west). Uses a circular colormap so north is consistent at both ends of the scale. Flat areas are shown as NaN.
+
 ### Rugosity
 
 ```python

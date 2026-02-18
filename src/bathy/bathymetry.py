@@ -908,6 +908,34 @@ class Bathymetry:
             vrm, coords=self.data.coords, dims=self.data.dims, name="rugosity"
         )
 
+    def aspect(self) -> xr.DataArray:
+        """
+        Calculate seafloor aspect.
+
+        Aspect is the compass direction of the steepest upslope gradient,
+        measured in degrees clockwise from north (0° = north, 90° = east,
+        180° = south, 270° = west). Flat areas are returned as NaN.
+
+        Returns
+        -------
+        xr.DataArray
+            Aspect in degrees [0, 360), NaN where slope is zero
+
+        Examples
+        --------
+        >>> asp = bath.aspect()
+        >>> bath.plot_aspect()
+        """
+        dy, dx = self._cell_size_metres()
+        gy, gx = np.gradient(self.data.values, dy, dx)
+
+        asp = (90 - np.degrees(np.arctan2(gy, gx))) % 360
+        asp[np.sqrt(gx**2 + gy**2) == 0] = np.nan
+
+        return xr.DataArray(
+            asp, coords=self.data.coords, dims=self.data.dims, name="aspect"
+        )
+
     # Profile and Swath methods
 
     def profile(
@@ -1230,6 +1258,51 @@ class Bathymetry:
             **kwargs,
         )
         plt.colorbar(im, ax=ax, label=f"Rugosity VRM (r={radius_km} km)")
+
+        if contours is not None:
+            self._add_contours(ax, contours)
+
+        ax.set_xlabel("Longitude (°)")
+        ax.set_ylabel("Latitude (°)")
+        plt.show()
+
+    def plot_aspect(
+        self,
+        contours: int | list[float] | None = None,
+        **kwargs,
+    ) -> None:
+        """
+        Plot seafloor aspect.
+
+        Uses a circular colormap so that north (0°) and north (360°) share
+        the same colour.
+
+        Parameters
+        ----------
+        contours : int or list[float], optional
+            If int, number of contour levels to plot
+            If list, specific contour levels (in metres)
+            If None, no contours are plotted
+        **kwargs
+            Additional arguments passed to imshow
+        """
+        asp_data = self.aspect()
+        extent = get_extent(self.data)
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        im = ax.imshow(
+            asp_data.values,
+            cmap=cmo.phase,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            vmin=0,
+            vmax=360,
+            **kwargs,
+        )
+        cbar = plt.colorbar(im, ax=ax, label="Aspect")
+        cbar.set_ticks([0, 90, 180, 270, 360])
+        cbar.set_ticklabels(["0° N", "90° E", "180° S", "270° W", "360° N"])
 
         if contours is not None:
             self._add_contours(ax, contours)
