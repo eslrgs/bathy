@@ -312,6 +312,60 @@ def test_to_netcdf(fake_bathy, tmp_path):
     assert reloaded.shape == fake_bathy.shape
 
 
+def test_geomorphons_shape_and_name(fake_bathy):
+    """geomorphons returns correct shape and DataArray name."""
+    geom = fake_bathy.geomorphons(lookup_km=1.0)
+
+    assert geom.shape == fake_bathy.shape
+    assert geom.name == "geomorphons"
+
+
+def test_geomorphons_classes_in_range(fake_bathy):
+    """All class codes should be integers in 1–10."""
+    geom = fake_bathy.geomorphons(lookup_km=1.0)
+
+    assert geom.values.min() >= 1
+    assert geom.values.max() <= 10
+
+
+def test_geomorphons_flat_surface_is_flat(flat_bathy):
+    """Flat surface should be classified entirely as flat (class 1)."""
+    geom = flat_bathy.geomorphons(lookup_km=1.0)
+
+    # Interior cells (away from edges with fewer valid neighbours) should be flat
+    assert np.all(geom.values[2:-2, 2:-2] == 1)
+
+
+def test_geomorphons_peak_classified_correctly():
+    """Isolated high point surrounded by deep flat should be classified as peak."""
+    elevations = np.full((21, 21), -1000.0)
+    elevations[10, 10] = -100.0  # Peak
+
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 21), "lat": np.linspace(50, 55, 21)},
+        dims=["lat", "lon"],
+    )
+    geom = Bathymetry.from_array(data).geomorphons(lookup_km=1.0)
+
+    assert geom.values[10, 10] == 2  # peak
+
+
+def test_geomorphons_pit_classified_correctly():
+    """Isolated deep point surrounded by shallow flat should be classified as pit."""
+    elevations = np.full((21, 21), -100.0)
+    elevations[10, 10] = -1000.0  # Pit
+
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 21), "lat": np.linspace(50, 55, 21)},
+        dims=["lat", "lon"],
+    )
+    geom = Bathymetry.from_array(data).geomorphons(lookup_km=1.0)
+
+    assert geom.values[10, 10] == 10  # pit
+
+
 def test_from_gebco_opendap_skips_download_if_file_exists(temp_netcdf, monkeypatch):
     """from_gebco_opendap skips download if save_path exists."""
     download_called = False

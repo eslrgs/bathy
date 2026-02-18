@@ -936,6 +936,108 @@ class Bathymetry:
             asp, coords=self.data.coords, dims=self.data.dims, name="aspect"
         )
 
+    def geomorphons(
+        self, lookup_km: float = 2.0, flatness_threshold: float = 1.0
+    ) -> xr.DataArray:
+        """
+        Classify seafloor morphology using geomorphons.
+
+        For each cell, a single neighbour is sampled at ``lookup_km`` distance
+        in each of the eight principal directions. The line-of-sight angle to
+        that neighbour is compared to ``flatness_threshold``; directions are
+        coded as positive (+, neighbour above), negative (-, neighbour below),
+        or equal (=). The counts of + and - directions determine the class.
+
+        Each direction uses an independent step count so that the physical
+        sampling distance is consistent across all eight azimuths (cardinal
+        and diagonal directions look at the same distance, not the same number
+        of grid cells).
+
+        Parameters
+        ----------
+        lookup_km : float, default 2.0
+            Lookup distance in kilometres. Larger values capture broader forms.
+            Recommend at least 5–10 grid cells; for GEBCO (450 m) use ≥ 2 km.
+        flatness_threshold : float, default 1.0
+            Angle threshold in degrees below which differences are treated as flat.
+
+        Returns
+        -------
+        xr.DataArray
+            Integer class codes (1–10):
+            1=flat, 2=peak, 3=ridge, 4=shoulder, 5=spur,
+            6=slope, 7=hollow, 8=footslope, 9=valley, 10=pit
+
+        References
+        ----------
+        Jasiewicz, J., & Stepinski, T.F. (2013). Geomorphons — a pattern
+        recognition approach to classification and mapping of landforms.
+        Geomorphology, 182, 147–156.
+
+        Examples
+        --------
+        >>> geom = bath.geomorphons(lookup_km=2.0)
+        >>> bath.plot_geomorphons(lookup_km=2.0)
+        """
+        dy, dx = self._cell_size_metres()
+
+        z = self.data.values.astype(float)
+        ny, nx = z.shape
+
+        # 8 principal directions (row_step, col_step)
+        directions = [
+            (-1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+            (1, 0),
+            (1, -1),
+            (0, -1),
+            (-1, -1),
+        ]
+
+        threshold_rad = np.radians(flatness_threshold)
+        p = np.zeros((ny, nx), dtype=np.int8)  # neighbours above centre
+        m = np.zeros((ny, nx), dtype=np.int8)  # neighbours below centre
+
+        for drow, dcol in directions:
+            # Per-direction step count so physical distance ≈ lookup_km in all azimuths.
+            # Diagonal steps cover sqrt(2) × more distance per cell than cardinal ones,
+            # so they get proportionally fewer steps.
+            step_dist = np.sqrt((drow * dy) ** 2 + (dcol * dx) ** 2)
+            n = max(1, round(lookup_km * 1000 / step_dist))
+            horiz = n * step_dist
+            row_off = drow * n
+            col_off = dcol * n
+            i0 = max(0, -row_off)
+            i1 = ny - max(0, row_off)
+            j0 = max(0, -col_off)
+            j1 = nx - max(0, col_off)
+
+            dz = (
+                z[i0 + row_off : i1 + row_off, j0 + col_off : j1 + col_off]
+                - z[i0:i1, j0:j1]
+            )
+            angle = np.arctan2(dz, horiz)
+            p[i0:i1, j0:j1] += (angle > threshold_rad).astype(np.int8)
+            m[i0:i1, j0:j1] += (angle < -threshold_rad).astype(np.int8)
+
+        # Classify: p = above count, m = below count (each 0–8)
+        geom = np.full((ny, nx), 6, dtype=np.int8)  # default: slope
+        geom[(p == 0) & (m == 0)] = 1  # flat
+        geom[(p == 0) & (m >= 5)] = 2  # peak
+        geom[(p == 0) & (0 < m) & (m < 5)] = 3  # ridge
+        geom[(m == 0) & (0 < p) & (p < 5)] = 9  # valley
+        geom[(m == 0) & (p >= 5)] = 10  # pit
+        geom[(m > p) & (p > 0) & ((m - p) >= 3)] = 4  # shoulder
+        geom[(m > p) & (p > 0) & ((m - p) < 3)] = 5  # spur
+        geom[(p > m) & (m > 0) & ((p - m) >= 3)] = 8  # footslope
+        geom[(p > m) & (m > 0) & ((p - m) < 3)] = 7  # hollow
+
+        return xr.DataArray(
+            geom, coords=self.data.coords, dims=self.data.dims, name="geomorphons"
+        )
+
     # Profile and Swath methods
 
     def profile(
@@ -1306,6 +1408,79 @@ class Bathymetry:
 
         if contours is not None:
             self._add_contours(ax, contours)
+
+        ax.set_xlabel("Longitude (°)")
+        ax.set_ylabel("Latitude (°)")
+        plt.show()
+
+    def plot_geomorphons(
+        self,
+        lookup_km: float = 2.0,
+        flatness_threshold: float = 1.0,
+        **kwargs,
+    ) -> None:
+        """
+        Plot seafloor morphology using geomorphons.
+
+        Parameters
+        ----------
+        lookup_km : float, default 2.0
+            Lookup distance in kilometres (passed to geomorphons()).
+        flatness_threshold : float, default 1.0
+            Flatness angle threshold in degrees (passed to geomorphons()).
+        **kwargs
+            Additional arguments passed to imshow.
+
+        Examples
+        --------
+        >>> bath.plot_geomorphons(lookup_km=2.0)
+        """
+        geom_data = self.geomorphons(lookup_km, flatness_threshold)
+        extent = get_extent(self.data)
+
+        labels = [
+            "Flat",
+            "Peak",
+            "Ridge",
+            "Shoulder",
+            "Spur",
+            "Slope",
+            "Hollow",
+            "Footslope",
+            "Valley",
+            "Pit",
+        ]
+        # Warm (elevated) → grey (neutral) → cool (depressed) scheme
+        colors = [
+            "#d9d9d9",  # flat      — medium grey
+            "#7a0000",  # peak      — dark red-brown
+            "#c0392b",  # ridge     — muted red
+            "#e07b6b",  # shoulder  — muted salmon
+            "#e8a45a",  # spur      — muted orange
+            "#909090",  # slope     — mid-grey
+            "#5dade2",  # hollow    — muted sky blue
+            "#2980b9",  # footslope — medium blue
+            "#1a5276",  # valley    — dark teal-blue
+            "#0b2545",  # pit       — near-black navy
+        ]
+
+        cmap = ListedColormap(colors)
+        norm = BoundaryNorm(np.arange(0.5, 11.5), len(colors))
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        im = ax.imshow(
+            geom_data.values,
+            cmap=cmap,
+            norm=norm,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            **kwargs,
+        )
+
+        cbar = plt.colorbar(im, ax=ax, label="Geomorphon")
+        cbar.set_ticks(range(1, 11))
+        cbar.set_ticklabels(labels)
 
         ax.set_xlabel("Longitude (°)")
         ax.set_ylabel("Latitude (°)")

@@ -17,6 +17,7 @@
         - bpi
         - rugosity
         - aspect
+        - geomorphons
         - hypsometric_index
         - hypsometric_curve
         - profile
@@ -27,6 +28,7 @@
         - plot_bpi
         - plot_rugosity
         - plot_aspect
+        - plot_geomorphons
         - plot_histogram
         - plot_depth_zones
         - plot_hypsometric_curve
