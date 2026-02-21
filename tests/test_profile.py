@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from shapely.geometry import LineString
 
-from bathy.profile import Profile, profiles_to_gdf
+from bathy.profile import Profile, to_gdf
 
 
 def test_create_profile(fake_data):
@@ -114,46 +114,23 @@ def test_knickpoints_with_smoothing(fake_data):
 # GeoDataFrame methods
 
 
-def test_to_gdf_crs(fake_profile):
-    """to_gdf sets CRS to EPSG:4326."""
-    gdf = fake_profile.to_gdf()
+def test_to_gdf(fake_profile):
+    """to_gdf returns a GeoDataFrame with correct CRS, geometry, and statistics."""
+    gdf = to_gdf(fake_profile)
 
     assert gdf.crs.to_epsg() == 4326
-
-
-def test_to_gdf_geometry_is_linestring(fake_profile):
-    """to_gdf geometry is a LineString with correct endpoints."""
-    gdf = fake_profile.to_gdf()
-
     assert gdf.geometry.iloc[0].geom_type == "LineString"
     coords = list(gdf.geometry.iloc[0].coords)
     assert coords[0] == pytest.approx((-9.0, 52.0))
     assert coords[-1] == pytest.approx((-6.0, 53.0))
-
-
-def test_to_gdf_stat_columns(fake_profile):
-    """to_gdf includes name and key elevation statistics."""
-    gdf = fake_profile.to_gdf()
-
     assert gdf["name"].iloc[0] == "Test Profile"
     assert gdf["total_distance_km"].iloc[0] > 0
     assert gdf["min_elevation_m"].iloc[0] <= gdf["max_elevation_m"].iloc[0]
     assert gdf["mean_elevation_m"].iloc[0] < 0
 
 
-def test_to_gdf_scalar_metadata_included(fake_data):
-    """to_gdf includes scalar metadata as extra columns."""
-    prof = Profile(
-        fake_data, -9, 52, -6, 53, num_points=10, metadata={"source": "survey_A"}
-    )
-    gdf = prof.to_gdf()
-
-    assert "source" in gdf.columns
-    assert gdf["source"].iloc[0] == "survey_A"
-
-
-def test_to_gdf_metadata_collision_not_overwritten(fake_data):
-    """Metadata keys matching core columns do not overwrite them."""
+def test_to_gdf_metadata(fake_data):
+    """to_gdf includes scalar metadata; core columns win over clashing metadata keys."""
     prof = Profile(
         fake_data,
         -9,
@@ -162,10 +139,11 @@ def test_to_gdf_metadata_collision_not_overwritten(fake_data):
         53,
         num_points=10,
         name="Real",
-        metadata={"name": "Impostor"},
+        metadata={"source": "survey_A", "name": "Impostor"},
     )
-    gdf = prof.to_gdf()
+    gdf = to_gdf(prof)
 
+    assert gdf["source"].iloc[0] == "survey_A"
     assert gdf["name"].iloc[0] == "Real"
 
 
@@ -223,18 +201,18 @@ def test_from_gdf_metadata_stored(fake_data):
     assert profiles[0].metadata["cruise"] == "RC1234"
 
 
-def test_profiles_to_gdf(fake_data):
-    """profiles_to_gdf returns one row per profile with correct CRS."""
+def test_to_gdf_multiple_profiles(fake_data):
+    """to_gdf returns one row per profile with correct CRS."""
     prof1 = Profile(fake_data, -9, 52, -6, 53, num_points=10, name="P1")
     prof2 = Profile(fake_data, -9, 53, -6, 54, num_points=10, name="P2")
-    gdf = profiles_to_gdf([prof1, prof2])
+    gdf = to_gdf([prof1, prof2])
 
     assert len(gdf) == 2
     assert gdf.crs.to_epsg() == 4326
     assert list(gdf["name"]) == ["P1", "P2"]
 
 
-def test_profiles_to_gdf_empty_raises():
-    """profiles_to_gdf raises ValueError for empty list."""
+def test_to_gdf_empty_raises():
+    """to_gdf raises ValueError for empty list."""
     with pytest.raises(ValueError):
-        profiles_to_gdf([])
+        to_gdf([])

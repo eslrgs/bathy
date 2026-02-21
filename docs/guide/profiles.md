@@ -27,19 +27,28 @@ profile = bath.profile(
 )
 ```
 
-### From shapefile
+### From shapefile or GeoDataFrame
 
-Load profiles from a shapefile of linestrings:
+Load profiles from a shapefile or an in-memory GeoDataFrame of LineStrings:
 
 ```python
 from bathy import Profile
 
+# From shapefile
 profiles = Profile.from_shapefile(
     bath.data,
     "path/to/canyons.shp",
     id_column="NAME",
 )
+
+# From GeoDataFrame
+import geopandas as gpd
+
+gdf = gpd.read_file("canyons.gpkg")
+profiles = Profile.from_gdf(bath.data, gdf, id_column="NAME")
 ```
+
+Features outside the DEM extent are skipped automatically. Any non-geometry columns in the GeoDataFrame are stored as profile metadata.
 
 ## Profile analysis
 
@@ -134,6 +143,23 @@ cross_sections = Profile.cross_sections(
     num_points=50,
 )
 ```
+
+## GeoDataFrame export
+
+Export a single profile or a collection to a GeoDataFrame for use with GeoPandas, QGIS, or spatial analysis workflows:
+
+```python
+from bathy.profile import to_gdf
+
+# Single profile
+gdf = to_gdf(prof)
+
+# Multiple profiles
+gdf = to_gdf([prof1, prof2, prof3])
+gdf.to_file("profiles.gpkg", driver="GPKG")
+```
+
+Each row contains the profile geometry (LineString), summary statistics (`total_distance_km`, `min_elevation_m`, `max_elevation_m`, `mean_elevation_m`), and any scalar metadata attached to the profile.
 
 ## Comparing multiple profiles
 

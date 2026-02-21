@@ -6,7 +6,6 @@ import cmocean.cm as cmo
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import polars as pl
 import xarray as xr
 from geographiclib.geodesic import Geodesic
@@ -105,6 +104,10 @@ class Profile:
 
         # Extract profile elevations and distances
         self.elevations, self.distances = self._extract_profile()
+
+        # Store endpoints as path for consistency with from_coordinates
+        self.metadata["path_lons"] = [start_lon, end_lon]
+        self.metadata["path_lats"] = [start_lat, end_lat]
 
     def __repr__(self) -> str:
         name = f'"{self.name}", ' if self.name else ""
@@ -349,7 +352,7 @@ class Profile:
     def from_gdf(
         cls,
         data: xr.DataArray,
-        gdf,
+        gdf: gpd.GeoDataFrame,
         id_column: str | None = None,
     ) -> list["Profile"]:
         """
@@ -435,48 +438,6 @@ class Profile:
             )
 
         return profiles
-
-    def to_gdf(self):
-        """
-        Export the profile as a GeoDataFrame.
-
-        Returns a single-row GeoDataFrame with a LineString geometry
-        representing the profile path, key statistics, and any scalar
-        metadata (e.g. shapefile attributes) as columns.
-
-        Returns
-        -------
-        geopandas.GeoDataFrame
-            Columns: name, total_distance_km, min_elevation_m,
-            max_elevation_m, mean_elevation_m, plus any scalar metadata.
-            CRS is EPSG:4326.
-
-        Examples
-        --------
-        >>> gdf = prof.to_gdf()
-        >>> gdf.to_file("profile.gpkg", driver="GPKG")
-        """
-        if "path_lons" in self.metadata:
-            coords = list(zip(self.metadata["path_lons"], self.metadata["path_lats"]))
-        else:
-            coords = [(self.start_lon, self.start_lat), (self.end_lon, self.end_lat)]
-
-        row = {
-            "name": [self.name],
-            "total_distance_km": [float(self.distances[-1])],
-            "min_elevation_m": [float(np.nanmin(self.elevations))],
-            "max_elevation_m": [float(np.nanmax(self.elevations))],
-            "mean_elevation_m": [float(np.nanmean(self.elevations))],
-        }
-
-        # Include scalar metadata (e.g. attributes from from_shapefile),
-        # skipping internal keys and any that would collide with core columns.
-        skip = {"path_lons", "path_lats"} | row.keys()
-        for key, val in self.metadata.items():
-            if key not in skip and not isinstance(val, (list, dict)):
-                row[key] = [val]
-
-        return gpd.GeoDataFrame(row, geometry=[LineString(coords)], crs="EPSG:4326")
 
     @staticmethod
     def _validate_coordinates(
@@ -1157,37 +1118,61 @@ def compare_stats(profiles: list[Profile]) -> pl.DataFrame:
     return pl.DataFrame(data)
 
 
-def profiles_to_gdf(profiles: list[Profile]):
+def to_gdf(profiles: Profile | list[Profile]) -> gpd.GeoDataFrame:
     """
-    Export multiple profiles as a GeoDataFrame.
+    Export one or more profiles as a GeoDataFrame.
 
-    Concatenates each profile's :meth:`Profile.to_gdf` result into a single
-    GeoDataFrame with one row per profile. Useful for spatial comparison and
-    export to GIS formats.
+    Returns one row per profile with a LineString geometry, key statistics,
+    and any scalar metadata as columns.
 
     Parameters
     ----------
-    profiles : list[Profile]
-        Profiles to export.
+    profiles : Profile or list[Profile]
+        A single profile or a list of profiles to export.
 
     Returns
     -------
     geopandas.GeoDataFrame
-        One row per profile. CRS is EPSG:4326.
+        Columns: name, total_distance_km, min_elevation_m,
+        max_elevation_m, mean_elevation_m, plus any scalar metadata.
+        CRS is EPSG:4326.
+
+    Raises
+    ------
+    ValueError
+        If an empty list is passed.
 
     Examples
     --------
-    >>> from bathy.profile import profiles_to_gdf
-    >>> gdf = profiles_to_gdf([prof1, prof2])
+    >>> from bathy.profile import to_gdf
+    >>> gdf = to_gdf(prof)
+    >>> gdf = to_gdf([prof1, prof2])
     >>> gdf.to_file("profiles.gpkg", driver="GPKG")
     """
+    if isinstance(profiles, Profile):
+        profiles = [profiles]
     if not profiles:
         raise ValueError("Need at least one profile")
 
-    return gpd.GeoDataFrame(
-        pd.concat([p.to_gdf() for p in profiles], ignore_index=True),
-        crs="EPSG:4326",
-    )
+    rows = []
+    geometries = []
+    for p in profiles:
+        row = {k: v for k, v in p.metadata.items() if not isinstance(v, (list, dict))}
+        row.update(
+            {
+                "name": p.name,
+                "total_distance_km": float(p.distances[-1]),
+                "min_elevation_m": float(np.nanmin(p.elevations)),
+                "max_elevation_m": float(np.nanmax(p.elevations)),
+                "mean_elevation_m": float(np.nanmean(p.elevations)),
+            }
+        )
+        rows.append(row)
+        geometries.append(
+            LineString(zip(p.metadata["path_lons"], p.metadata["path_lats"]))
+        )
+
+    return gpd.GeoDataFrame(rows, geometry=geometries, crs="EPSG:4326")
 
 
 def plot_profiles(

@@ -6,6 +6,7 @@
         - __init__
         - from_coordinates
         - from_shapefile
+        - from_gdf
         - cross_sections
         - stats
         - max_depth
@@ -18,6 +19,7 @@
 
 ## Profile utilities
 
+::: bathy.profile.to_gdf
 ::: bathy.profile.plot_profiles
 ::: bathy.profile.plot_profiles_map
 ::: bathy.profile.plot_profiles_grid

@@ -59,11 +59,12 @@ uv pip install .
 - Profiles: `profile()`
 
 **Profile class:**
-- Analysis: `stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `from_coordinates()`, `cross_sections()`, `from_shapefile()`
-- Plotting: `plot()`, `plot_gradient()`, `plot_canyons()`
+- Analysis: `stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`
+- I/O: `from_coordinates()`, `from_shapefile()`, `from_gdf()`, `cross_sections()`
+- Plotting: `plot()`, `plot_gradient()`, `plot_canyons()`, `plot_knickpoints()`
 
 **Multi-profile functions (profile module):**
-- Analysis: `compare_stats()`
+- Analysis: `compare_stats()`, `to_gdf()`
 - Plotting: `plot_profiles()`, `plot_profiles_grid()`, `plot_profiles_map()`
 
 ## Preset regions
