@@ -1574,14 +1574,14 @@ class Bathymetry:
 
         # --- Row 3: second-order ---
 
-        vmax = float(np.nanmax(np.abs(cu.values)))
+        vmax = float(np.nanpercentile(np.abs(cu.values), 99))
         im = axes[2, 0].imshow(
             cu.values, cmap=cmo.balance, vmin=-vmax, vmax=vmax, **imkw
         )
         plt.colorbar(im, ax=axes[2, 0], label="m⁻¹")
         axes[2, 0].set_title(title(4, "Curvature"))
 
-        vmax = float(np.nanmax(np.abs(bp.values)))
+        vmax = float(np.nanpercentile(np.abs(bp.values), 99))
         im = axes[2, 1].imshow(
             bp.values, cmap=cmo.balance, vmin=-vmax, vmax=vmax, **imkw
         )

@@ -58,6 +58,14 @@ def flat_bathy():
 
 
 @pytest.fixture
+def fake_profile(fake_data):
+    """Straight-line profile across the fake bathymetry grid."""
+    from bathy.profile import Profile
+
+    return Profile(fake_data, -9, 52, -6, 53, num_points=20, name="Test Profile")
+
+
+@pytest.fixture
 def temp_netcdf(fake_bathy):
     """Temporary NetCDF file for testing file loading."""
     with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as tmp:

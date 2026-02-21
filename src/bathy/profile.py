@@ -3,14 +3,17 @@
 import logging
 
 import cmocean.cm as cmo
+import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import polars as pl
 import xarray as xr
 from geographiclib.geodesic import Geodesic
 from scipy.integrate import trapezoid
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
+from shapely.geometry import LineString
 
 from bathy.utils import get_extent
 
@@ -340,25 +343,49 @@ class Profile:
         ...     bath.data, "canyons.shp", id_column="NAME"
         ... )
         """
-        try:
-            import geopandas as gpd
-        except ImportError:
-            raise ImportError(
-                "geopandas is required for shapefile support. "
-                "Install with: pip install geopandas"
-            )
+        return cls.from_gdf(data, gpd.read_file(shapefile_path), id_column=id_column)
 
+    @classmethod
+    def from_gdf(
+        cls,
+        data: xr.DataArray,
+        gdf,
+        id_column: str | None = None,
+    ) -> list["Profile"]:
+        """
+        Create profiles from LineString features in a GeoDataFrame.
+
+        The in-memory equivalent of :meth:`from_shapefile`. Each LineString
+        row becomes one profile; MultiLineString rows are split into separate
+        profiles. All non-geometry columns are stored as profile metadata.
+
+        Parameters
+        ----------
+        data : xr.DataArray
+            Elevation data.
+        gdf : geopandas.GeoDataFrame
+            GeoDataFrame with LineString or MultiLineString geometries.
+        id_column : str, optional
+            Column to use for profile names. If None, uses sequential numbering.
+
+        Returns
+        -------
+        list[Profile]
+            One Profile per LineString.
+
+        Examples
+        --------
+        >>> profiles = Profile.from_gdf(bath.data, gdf, id_column="name")
+        """
         profiles = []
         skipped = 0
+        lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
+        lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
 
-        # Read shapefile using geopandas
-        gdf = gpd.read_file(shapefile_path)
-
-        for idx, row in gdf.iterrows():
+        for seq, (_, row) in enumerate(gdf.iterrows(), start=1):
             geom = row.geometry
             attributes = row.drop("geometry").to_dict()
 
-            # Extract linestrings
             linestrings = []
             if geom.geom_type == "LineString":
                 linestrings.append(geom)
@@ -366,54 +393,90 @@ class Profile:
                 linestrings.extend(geom.geoms)
             else:
                 logger.warning(
-                    f"Skipping feature {idx}: unsupported "
-                    f"geometry type {geom.geom_type}"
+                    f"Skipping feature {seq}: unsupported geometry type "
+                    f"{geom.geom_type}"
                 )
                 skipped += 1
                 continue
 
-            # Create profile for each linestring
             for sub_idx, line in enumerate(linestrings):
-                coords = list(line.coords)
-
-                # Check if coordinates are within DEM bounds
-                lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
-                lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
+                # Take only (lon, lat) — safe for 2D and 3D geometries
+                coords = [(c[0], c[1]) for c in line.coords]
 
                 within_bounds = any(
                     lon_min <= lon <= lon_max and lat_min <= lat <= lat_max
                     for lon, lat in coords
                 )
-
                 if not within_bounds:
                     skipped += 1
                     continue
 
-                # Create profile name
                 if id_column and id_column in attributes:
                     name = str(attributes[id_column])
                 else:
-                    name = f"Feature_{idx + 1}"
+                    name = f"Feature_{seq}"
                     if len(linestrings) > 1:
                         name += f"_Part_{sub_idx + 1}"
 
-                # Add sub_index to metadata for MultiLineStrings
+                meta = dict(attributes)
                 if len(linestrings) > 1:
-                    attributes["sub_index"] = sub_idx
+                    meta["sub_index"] = sub_idx
 
-                # Use Profile.from_coordinates classmethod
-                profile = cls.from_coordinates(
-                    data=data, coordinates=coords, name=name, metadata=attributes
+                profiles.append(
+                    cls.from_coordinates(
+                        data=data, coordinates=coords, name=name, metadata=meta
+                    )
                 )
-                profiles.append(profile)
 
         if skipped > 0:
             logger.warning(
-                f"Skipped {skipped} feature(s) outside DEM "
-                f"bounds or with unsupported geometry"
+                f"Skipped {skipped} feature(s) outside DEM bounds or with "
+                f"unsupported geometry"
             )
 
         return profiles
+
+    def to_gdf(self):
+        """
+        Export the profile as a GeoDataFrame.
+
+        Returns a single-row GeoDataFrame with a LineString geometry
+        representing the profile path, key statistics, and any scalar
+        metadata (e.g. shapefile attributes) as columns.
+
+        Returns
+        -------
+        geopandas.GeoDataFrame
+            Columns: name, total_distance_km, min_elevation_m,
+            max_elevation_m, mean_elevation_m, plus any scalar metadata.
+            CRS is EPSG:4326.
+
+        Examples
+        --------
+        >>> gdf = prof.to_gdf()
+        >>> gdf.to_file("profile.gpkg", driver="GPKG")
+        """
+        if "path_lons" in self.metadata:
+            coords = list(zip(self.metadata["path_lons"], self.metadata["path_lats"]))
+        else:
+            coords = [(self.start_lon, self.start_lat), (self.end_lon, self.end_lat)]
+
+        row = {
+            "name": [self.name],
+            "total_distance_km": [float(self.distances[-1])],
+            "min_elevation_m": [float(np.nanmin(self.elevations))],
+            "max_elevation_m": [float(np.nanmax(self.elevations))],
+            "mean_elevation_m": [float(np.nanmean(self.elevations))],
+        }
+
+        # Include scalar metadata (e.g. attributes from from_shapefile),
+        # skipping internal keys and any that would collide with core columns.
+        skip = {"path_lons", "path_lats"} | row.keys()
+        for key, val in self.metadata.items():
+            if key not in skip and not isinstance(val, (list, dict)):
+                row[key] = [val]
+
+        return gpd.GeoDataFrame(row, geometry=[LineString(coords)], crs="EPSG:4326")
 
     @staticmethod
     def _validate_coordinates(
@@ -1092,6 +1155,39 @@ def compare_stats(profiles: list[Profile]) -> pl.DataFrame:
         data[profile_name] = [stats[stat] for stat in statistic_names]
 
     return pl.DataFrame(data)
+
+
+def profiles_to_gdf(profiles: list[Profile]):
+    """
+    Export multiple profiles as a GeoDataFrame.
+
+    Concatenates each profile's :meth:`Profile.to_gdf` result into a single
+    GeoDataFrame with one row per profile. Useful for spatial comparison and
+    export to GIS formats.
+
+    Parameters
+    ----------
+    profiles : list[Profile]
+        Profiles to export.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        One row per profile. CRS is EPSG:4326.
+
+    Examples
+    --------
+    >>> from bathy.profile import profiles_to_gdf
+    >>> gdf = profiles_to_gdf([prof1, prof2])
+    >>> gdf.to_file("profiles.gpkg", driver="GPKG")
+    """
+    if not profiles:
+        raise ValueError("Need at least one profile")
+
+    return gpd.GeoDataFrame(
+        pd.concat([p.to_gdf() for p in profiles], ignore_index=True),
+        crs="EPSG:4326",
+    )
 
 
 def plot_profiles(
