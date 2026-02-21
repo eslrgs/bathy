@@ -1022,7 +1022,8 @@ class Bathymetry:
             p[i0:i1, j0:j1] += (angle > threshold_rad).astype(np.int8)
             m[i0:i1, j0:j1] += (angle < -threshold_rad).astype(np.int8)
 
-        # Classify: p = above count, m = below count (each 0–8)
+        # Classify: p = above count, m = below count (each 0–8).
+        # Tied (p == m > 0) cells default to slope — ambiguous transitional terrain.
         geom = np.full((ny, nx), 6, dtype=np.int8)  # default: slope
         geom[(p == 0) & (m == 0)] = 1  # flat
         geom[(p == 0) & (m >= 5)] = 2  # peak
@@ -1478,12 +1479,165 @@ class Bathymetry:
             **kwargs,
         )
 
-        cbar = plt.colorbar(im, ax=ax, label="Geomorphon")
+        cbar = plt.colorbar(im, ax=ax)
         cbar.set_ticks(range(1, 11))
         cbar.set_ticklabels(labels)
 
         ax.set_xlabel("Longitude (°)")
         ax.set_ylabel("Latitude (°)")
+        plt.show()
+
+    def plot_overview(
+        self,
+        bpi_radius_km: float = 1.0,
+        rugosity_radius_km: float = 1.0,
+        geomorphons_lookup_km: float = 2.0,
+        label_prefix: list[str] | None = None,
+    ) -> None:
+        """
+        Plot key bathymetric metrics as subplot overview.
+
+        Computes and displays bathymetry, hillshade, slope, aspect, curvature,
+        BPI, rugosity, and geomorphons in a single 4 × 2 figure. Panels are
+        ordered as reference and first-order derivatives (rows 1–2) followed by
+        second-order and contextual metrics (rows 3–4).
+
+        Parameters
+        ----------
+        bpi_radius_km : float, default 1.0
+            Neighbourhood radius for BPI in kilometres.
+        rugosity_radius_km : float, default 1.0
+            Neighbourhood radius for rugosity in kilometres.
+        geomorphons_lookup_km : float, default 2.0
+            Lookup distance for geomorphons in kilometres.
+        label_prefix : list[str] | None, default None
+            Optional list of 8 prefix strings prepended to each panel title,
+            e.g. ``["(a)", "(b)", ..., "(h)"]``. If None, no prefix is added.
+
+        Examples
+        --------
+        >>> bath.plot_overview()
+        >>> prefixes = ["(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)"]
+        >>> bath.plot_overview(label_prefix=prefixes)
+        """
+        prefixes = label_prefix or [""] * 8
+
+        def title(i: int, name: str) -> str:
+            p = prefixes[i]
+            return f"{p} {name}" if p else name
+
+        extent = get_extent(self.data)
+        imkw = dict(origin="lower", extent=extent, aspect="auto")
+
+        # Pre-compute: reference, first-order, second-order, contextual, classification
+        hs = hillshade(-self.data, azimuth=315, angle_altitude=45)
+        sl = self.slope()
+        asp = self.aspect()
+        cu = self.curvature()
+        bp = self.bpi(bpi_radius_km)
+        vr = self.rugosity(rugosity_radius_km)
+        gm = self.geomorphons(geomorphons_lookup_km)
+
+        fig, axes = plt.subplots(
+            4,
+            2,
+            figsize=(12, 20),
+            constrained_layout=True,
+            sharex=True,
+            sharey=True,
+        )
+
+        # --- Row 1: reference ---
+
+        im = axes[0, 0].imshow(
+            self.data.where(self.data < 0).values, cmap=cmo.deep_r, **imkw
+        )
+        plt.colorbar(im, ax=axes[0, 0], label="m")
+        axes[0, 0].set_title(title(0, "Bathymetry"))
+
+        # Hillshade — no colorbar (values are relative brightness only)
+        axes[0, 1].imshow(hs.values, cmap="gray", **imkw)
+        axes[0, 1].set_title(title(1, "Hillshade"))
+
+        # --- Row 2: first-order ---
+
+        vmax = float(np.nanpercentile(sl.values, 99))
+        im = axes[1, 0].imshow(sl.values, cmap="Greys", vmin=0, vmax=vmax, **imkw)
+        plt.colorbar(im, ax=axes[1, 0], label="°")
+        axes[1, 0].set_title(title(2, "Slope"))
+
+        im = axes[1, 1].imshow(asp.values, cmap=cmo.phase, vmin=0, vmax=360, **imkw)
+        cbar = plt.colorbar(im, ax=axes[1, 1])
+        cbar.set_ticks([0, 90, 180, 270, 360])
+        cbar.set_ticklabels(["N", "E", "S", "W", "N"])
+        axes[1, 1].set_title(title(3, "Aspect"))
+
+        # --- Row 3: second-order ---
+
+        vmax = float(np.nanmax(np.abs(cu.values)))
+        im = axes[2, 0].imshow(
+            cu.values, cmap=cmo.balance, vmin=-vmax, vmax=vmax, **imkw
+        )
+        plt.colorbar(im, ax=axes[2, 0], label="m⁻¹")
+        axes[2, 0].set_title(title(4, "Curvature"))
+
+        vmax = float(np.nanmax(np.abs(bp.values)))
+        im = axes[2, 1].imshow(
+            bp.values, cmap=cmo.balance, vmin=-vmax, vmax=vmax, **imkw
+        )
+        plt.colorbar(im, ax=axes[2, 1], label="m")
+        axes[2, 1].set_title(title(5, f"BPI (r={bpi_radius_km} km)"))
+
+        # --- Row 4: contextual ---
+
+        vmax = float(np.nanpercentile(vr.values, 99))
+        im = axes[3, 0].imshow(vr.values, cmap=cmo.amp, vmin=0, vmax=vmax, **imkw)
+        plt.colorbar(im, ax=axes[3, 0], label="VRM")
+        axes[3, 0].set_title(title(6, f"Rugosity (r={rugosity_radius_km} km)"))
+
+        geom_colors = [
+            "#d9d9d9",
+            "#7a0000",
+            "#c0392b",
+            "#e07b6b",
+            "#e8a45a",
+            "#909090",
+            "#5dade2",
+            "#2980b9",
+            "#1a5276",
+            "#0b2545",
+        ]
+        geom_labels = [
+            "Flat",
+            "Peak",
+            "Ridge",
+            "Shoulder",
+            "Spur",
+            "Slope",
+            "Hollow",
+            "Footslope",
+            "Valley",
+            "Pit",
+        ]
+        im = axes[3, 1].imshow(
+            gm.values,
+            cmap=ListedColormap(geom_colors),
+            norm=BoundaryNorm(np.arange(0.5, 11.5), 10),
+            **imkw,
+        )
+        cbar = plt.colorbar(im, ax=axes[3, 1])
+        cbar.set_ticks(range(1, 11))
+        cbar.set_ticklabels(geom_labels, fontsize=7)
+        axes[3, 1].set_title(title(7, f"Geomorphons ({geomorphons_lookup_km} km)"))
+
+        # Axis labels on outer panels only; suppress inner tick labels
+        for ax in axes[3, :]:
+            ax.set_xlabel("Longitude (°)")
+        for ax in axes[:, 0]:
+            ax.set_ylabel("Latitude (°)")
+        for ax in axes.ravel():
+            ax.label_outer()
+
         plt.show()
 
     def plot_histogram(self, bins: int = 50, **kwargs) -> None:

@@ -54,8 +54,8 @@ uv pip install .
 ## Features
 
 **Bathymetry class:**
-- Analysis: `summary()`, `depth_stats()`, `coverage()`, `slope()`, `curvature()`, `hypsometric_index()`, `hypsometric_curve()`
-- Plotting: `plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_curvature()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`
+- Analysis: `summary()`, `depth_stats()`, `coverage()`, `slope()`, `aspect()`, `curvature()`, `bpi()`, `rugosity()`, `geomorphons()`, `hypsometric_index()`, `hypsometric_curve()`
+- Plotting: `plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_aspect()`, `plot_curvature()`, `plot_bpi()`, `plot_rugosity()`, `plot_geomorphons()`, `plot_overview()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`
 - Profiles: `profile()`
 
 **Profile class:**

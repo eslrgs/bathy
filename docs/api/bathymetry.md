@@ -29,6 +29,7 @@
         - plot_rugosity
         - plot_aspect
         - plot_geomorphons
+        - plot_overview
         - plot_histogram
         - plot_depth_zones
         - plot_hypsometric_curve
