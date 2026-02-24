@@ -4,13 +4,120 @@ import logging
 from importlib.metadata import version
 
 from bathy import profile
-from bathy.bathymetry import Bathymetry, list_regions
-from bathy.profile import Profile
+from bathy.analysis import (
+    aspect,
+    bpi,
+    curvature,
+    geomorphons,
+    hypsometric_curve,
+    hypsometric_index,
+    rugosity,
+    slope,
+    summary,
+)
+from bathy.io import (
+    list_regions,
+    load_bathymetry,
+    load_gebco_opendap,
+    to_geotiff,
+)
+from bathy.plot import (
+    plot_aspect,
+    plot_bathy,
+    plot_bpi,
+    plot_curvature,
+    plot_depth_zones,
+    plot_geomorphons,
+    plot_hillshade,
+    plot_histogram,
+    plot_hypsometric_curve,
+    plot_overview,
+    plot_rugosity,
+    plot_slope,
+    plot_surface3d,
+)
+from bathy.profile import (
+    Profile,
+    compare_stats,
+    concavity_index,
+    cross_sections,
+    extract_profile,
+    get_canyons,
+    gradient,
+    knickpoints,
+    max_depth,
+    profile_from_coordinates,
+    profiles_from_gdf,
+    profiles_from_shapefile,
+    stats,
+    to_gdf,
+)
+from bathy.profile_plot import (
+    plot_canyons,
+    plot_gradient,
+    plot_knickpoints,
+    plot_profile,
+    plot_profiles,
+    plot_profiles_grid,
+    plot_profiles_map,
+)
 
 __version__ = version("bathy")
-__all__ = ["Bathymetry", "Profile", "profile", "list_regions", "__version__"]
+__all__ = [
+    # IO
+    "list_regions",
+    "load_bathymetry",
+    "load_gebco_opendap",
+    "to_geotiff",
+    # Analysis
+    "summary",
+    "hypsometric_index",
+    "hypsometric_curve",
+    "slope",
+    "curvature",
+    "bpi",
+    "rugosity",
+    "aspect",
+    "geomorphons",
+    # Plotting
+    "plot_bathy",
+    "plot_hillshade",
+    "plot_slope",
+    "plot_curvature",
+    "plot_bpi",
+    "plot_rugosity",
+    "plot_aspect",
+    "plot_geomorphons",
+    "plot_overview",
+    "plot_histogram",
+    "plot_depth_zones",
+    "plot_surface3d",
+    "plot_hypsometric_curve",
+    # Profile
+    "Profile",
+    "extract_profile",
+    "profile_from_coordinates",
+    "cross_sections",
+    "profiles_from_shapefile",
+    "profiles_from_gdf",
+    "stats",
+    "max_depth",
+    "gradient",
+    "concavity_index",
+    "knickpoints",
+    "get_canyons",
+    "compare_stats",
+    "to_gdf",
+    "plot_profile",
+    "plot_profiles",
+    "plot_profiles_grid",
+    "plot_profiles_map",
+    "plot_knickpoints",
+    "plot_gradient",
+    "plot_canyons",
+    # Submodule
+    "profile",
+    "__version__",
+]
 
-# Set up default logging configuration
-logging.basicConfig(
-    level=logging.WARNING, format="%(levelname)s - %(name)s: %(message)s"
-)
+logging.getLogger("bathy").addHandler(logging.NullHandler())

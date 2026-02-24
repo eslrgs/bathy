@@ -48,7 +48,9 @@ nav:
       - Profiles: guide/profiles.md
       - Visualisation: guide/visualisation.md
   - API Reference:
-      - Bathymetry: api/bathymetry.md
+      - IO: api/io.md
+      - Analysis: api/analysis.md
+      - Plotting: api/plot.md
       - Profile: api/profile.md
 
 markdown_extensions:

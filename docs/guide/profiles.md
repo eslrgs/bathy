@@ -4,15 +4,16 @@ Bathymetric profiles allow you to analyse depth variations along a transect.
 
 ## Creating profiles
 
-### From Bathymetry object
+### From coordinates
 
 ```python
-from bathy import Bathymetry
+import bathy
 
-bath = Bathymetry.from_gebco_opendap(region="mediterranean")
+data = bathy.load_gebco_opendap(region="mediterranean")
 
 # Create a profile with specific number of points
-profile = bath.profile(
+prof = bathy.extract_profile(
+    data,
     start=(-5, 36),
     end=(10, 40),
     num_points=200,
@@ -20,7 +21,8 @@ profile = bath.profile(
 )
 
 # Or with specific point spacing (in km)
-profile = bath.profile(
+prof = bathy.extract_profile(
+    data,
     start=(-5, 36),
     end=(10, 40),
     point_spacing=5.0,  # 5 km spacing
@@ -32,11 +34,9 @@ profile = bath.profile(
 Load profiles from a shapefile or an in-memory GeoDataFrame of LineStrings:
 
 ```python
-from bathy import Profile
-
 # From shapefile
-profiles = Profile.from_shapefile(
-    bath.data,
+profiles = bathy.profiles_from_shapefile(
+    data,
     "path/to/canyons.shp",
     id_column="NAME",
 )
@@ -45,7 +45,7 @@ profiles = Profile.from_shapefile(
 import geopandas as gpd
 
 gdf = gpd.read_file("canyons.gpkg")
-profiles = Profile.from_gdf(bath.data, gdf, id_column="NAME")
+profiles = bathy.profiles_from_gdf(data, gdf, id_column="NAME")
 ```
 
 Features outside the DEM extent are skipped automatically. Any non-geometry columns in the GeoDataFrame are stored as profile metadata.
@@ -55,20 +55,20 @@ Features outside the DEM extent are skipped automatically. Any non-geometry colu
 ### Basic statistics
 
 ```python
-profile.stats()
+bathy.stats(prof)
 ```
 
 ### Maximum depth
 
 ```python
-distance, depth = profile.max_depth()
+distance, depth = bathy.max_depth(prof)
 print(f"Max depth: {depth:.0f} m at {distance:.1f} km")
 ```
 
 ### Gradient
 
 ```python
-gradient = profile.gradient()  # Returns numpy array
+grad = bathy.gradient(prof)  # Returns numpy array
 ```
 
 ## Canyon detection
@@ -76,7 +76,7 @@ gradient = profile.gradient()  # Returns numpy array
 Identify submarine canyons along a profile:
 
 ```python
-canyons = profile.get_canyons(prominence=500)  # Minimum 500m prominence
+canyons = bathy.get_canyons(prof, prominence=500)  # Minimum 500m prominence
 print(canyons)
 ```
 
@@ -88,13 +88,13 @@ Identify knickpoints (abrupt slope changes):
 
 ```python
 # Auto-threshold (mean + 2 std)
-kp = profile.knickpoints()
+kp = bathy.knickpoints(prof)
 
 # Custom threshold
-kp = profile.knickpoints(threshold=5)
+kp = bathy.knickpoints(prof, threshold=5)
 
 # With smoothing
-kp = profile.knickpoints(smooth=3)
+kp = bathy.knickpoints(prof, smooth=3)
 ```
 
 ## Visualisation
@@ -102,46 +102,52 @@ kp = profile.knickpoints(smooth=3)
 ### Basic profile plot
 
 ```python
-profile.plot()
+bathy.plot_profile(prof)
 ```
 
 ### With smoothing
 
 ```python
-profile.plot(smooth=3.0)
+bathy.plot_profile(prof, smooth=3.0)
 ```
 
 ### With canyons highlighted
 
 ```python
-profile.plot_canyons(prominence=500)
+bathy.plot_canyons(prof, prominence=500)
 ```
 
 ### With knickpoints
 
 ```python
-kp = profile.knickpoints()
-profile.plot_knickpoints(kp)
+kp = bathy.knickpoints(prof)
+bathy.plot_knickpoints(prof, kp)
 ```
+
+All profile plot functions return `(fig, ax)`.
 
 ## Cross-sections
 
 Create perpendicular cross-sections along a main profile:
 
 ```python
-from bathy import Profile
-
 # Main profile
-main = bath.profile((-11, 47.5), (-6.5, 49), point_spacing=1.0)
+main = bathy.extract_profile(data, (-11, 47.5), (-6.5, 49), point_spacing=1.0)
 
 # Create cross-sections every 20 km, 30 km wide
-cross_sections = Profile.cross_sections(
-    bath.data,
+x_sections = bathy.cross_sections(
+    data,
     main,
     interval_km=20,
     section_width_km=30,
     num_points=50,
 )
+
+# Plot on map
+bathy.plot_profiles_map(x_sections, bathymetry_data=data, main_profile=main)
+
+# Plot in grid
+bathy.plot_profiles_grid(x_sections[:6], cols=3, main_profile=main)
 ```
 
 ## GeoDataFrame export
@@ -149,13 +155,11 @@ cross_sections = Profile.cross_sections(
 Export a single profile or a collection to a GeoDataFrame for use with GeoPandas, QGIS, or spatial analysis workflows:
 
 ```python
-from bathy.profile import to_gdf
-
 # Single profile
-gdf = to_gdf(prof)
+gdf = bathy.to_gdf(prof)
 
 # Multiple profiles
-gdf = to_gdf([prof1, prof2, prof3])
+gdf = bathy.to_gdf([prof1, prof2, prof3])
 gdf.to_file("profiles.gpkg", driver="GPKG")
 ```
 
@@ -164,20 +168,18 @@ Each row contains the profile geometry (LineString), summary statistics (`total_
 ## Comparing multiple profiles
 
 ```python
-from bathy import profile
-
 # Create several profiles
 profiles = [
-    bath.profile((-11, lat), (-6.5, lat), name=f"{lat}N")
+    bathy.extract_profile(data, (-11, lat), (-6.5, lat), name=f"{lat}N")
     for lat in [46.5, 47.5, 48.5]
 ]
 
 # Compare statistics
-profile.compare_stats(profiles)
+bathy.compare_stats(profiles)
 
 # Plot together
-profile.plot_profiles(profiles)
+bathy.plot_profiles(profiles)
 
 # Show on map
-profile.plot_profiles_map(profiles)
+bathy.plot_profiles_map(profiles, bathymetry_data=data)
 ```

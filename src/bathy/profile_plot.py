@@ -1,0 +1,536 @@
+"""Profile plotting functions."""
+
+import logging
+
+import cmocean.cm as cmo
+import matplotlib.pyplot as plt
+import numpy as np
+import polars as pl
+import xarray as xr
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from scipy.ndimage import gaussian_filter1d
+
+from bathy.profile import (
+    Profile,
+    _ensure_descending,
+    _normalise_profile,
+    get_canyons,
+    gradient,
+)
+from bathy.utils import get_extent
+
+logger = logging.getLogger(__name__)
+
+
+def plot_profile(
+    profile: Profile,
+    show_map: bool = False,
+    smooth: float | None = None,
+    normalize: bool = False,
+    ensure_descending: bool = False,
+    cmap=cmo.deep_r,
+    bathymetry_data: xr.DataArray | None = None,
+    **kwargs,
+) -> tuple[Figure, list[Axes]]:
+    """
+    Plot the bathymetric profile.
+
+    Parameters
+    ----------
+    profile : Profile
+    show_map : bool
+        If True, show map with profile line. Requires bathymetry_data.
+    smooth : float, optional
+        Gaussian smoothing sigma.
+    normalize : bool
+        If True, normalize elevation and distance to 0-1.
+    ensure_descending : bool
+        If True, orient profile to descend from higher to lower elevation.
+    bathymetry_data : xr.DataArray, optional
+        Background data for map view (required when show_map=True).
+    **kwargs
+        Additional arguments passed to matplotlib plot()
+
+    Returns
+    -------
+    Figure, list[Axes]
+    """
+    elevations = (
+        gaussian_filter1d(profile.elevations, sigma=smooth)
+        if smooth
+        else profile.elevations
+    )
+    distances = profile.distances.copy()
+
+    if ensure_descending:
+        distances, elevations = _ensure_descending(distances, elevations)
+
+    if normalize:
+        distances, elevations = _normalise_profile(distances, elevations)
+
+    ylim = (float(elevations.min()), float(elevations.max()))
+    xlim = (float(distances.min()), float(distances.max()))
+
+    if show_map:
+        fig, (ax_map, ax_profile) = plt.subplots(1, 2, figsize=(16, 6))
+
+        if bathymetry_data is not None:
+            extent = get_extent(bathymetry_data)
+            ax_map.imshow(
+                bathymetry_data.values,
+                cmap=cmap,
+                origin="lower",
+                extent=extent,
+                aspect="auto",
+            )
+        path_lons = profile.metadata.get(
+            "path_lons", [profile.start_lon, profile.end_lon]
+        )
+        path_lats = profile.metadata.get(
+            "path_lats", [profile.start_lat, profile.end_lat]
+        )
+        ax_map.plot(path_lons, path_lats, "r-", linewidth=2, label="Profile line")
+        ax_map.plot(path_lons[0], path_lats[0], "go", markersize=10, label="Start")
+        ax_map.plot(path_lons[-1], path_lats[-1], "ro", markersize=10, label="End")
+        ax_map.set_xlabel("Longitude (°)")
+        ax_map.set_ylabel("Latitude (°)")
+        ax_map.legend()
+    else:
+        fig, ax_profile = plt.subplots(figsize=(12, 5))
+
+    ax_profile.plot(distances, elevations, **kwargs)
+    ax_profile.fill_between(distances, elevations, elevations.min(), alpha=0.3)
+
+    ax_profile.set_xlabel("Normalized distance" if normalize else "Distance (km)")
+    ax_profile.set_ylabel("Normalized elevation" if normalize else "Elevation (m)")
+    ax_profile.set_xlim(xlim)
+    ax_profile.set_ylim(ylim)
+    ax_profile.grid(True, alpha=0.3)
+
+    if show_map:
+        return fig, [ax_map, ax_profile]
+    return fig, [ax_profile]
+
+
+def plot_knickpoints(
+    profile: Profile, knickpoints_df: pl.DataFrame, **kwargs
+) -> tuple[Figure, list[Axes]]:
+    """
+    Plot profile with knickpoints marked.
+
+    Parameters
+    ----------
+    profile : Profile
+    knickpoints_df : pl.DataFrame
+        Result from knickpoints()
+    **kwargs
+        Additional arguments passed to plot_profile
+
+    Returns
+    -------
+    Figure, list[Axes]
+    """
+    fig, axes = plot_profile(profile, **kwargs)
+    axes[-1].scatter(
+        knickpoints_df["distance_km"],
+        knickpoints_df["depth_m"],
+        c="red",
+        s=50,
+        zorder=5,
+        label="Knickpoints",
+    )
+    axes[-1].legend()
+    return fig, axes
+
+
+def plot_gradient(profile: Profile, **kwargs) -> tuple[Figure, list[Axes]]:
+    """
+    Plot the gradient (derivative) along the profile.
+
+    Parameters
+    ----------
+    profile : Profile
+    **kwargs
+        Additional arguments passed to plot
+
+    Returns
+    -------
+    Figure, Axes
+    """
+    grad = gradient(profile)
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(profile.distances, grad, **kwargs)
+    ax.axhline(0, color="gray", linestyle="--", alpha=0.5, linewidth=1)
+    ax.set_xlabel("Distance (km)")
+    ax.set_ylabel("Gradient (m km⁻¹)")
+    ax.grid(True, alpha=0.3)
+
+    return fig, [ax]
+
+
+def plot_canyons(
+    profile: Profile,
+    canyons: pl.DataFrame | None = None,
+    prominence: float | None = None,
+    smooth: float | None = None,
+    **kwargs,
+) -> tuple[Figure, list[Axes]]:
+    """
+    Plot profile with canyons marked.
+
+    Parameters
+    ----------
+    profile : Profile
+    canyons : pl.DataFrame, optional
+        Canyon data from get_canyons(). Detected if None.
+    prominence : float, optional
+        Minimum prominence for detection (ignored if canyons provided).
+    smooth : float, optional
+        Smoothing sigma (ignored if canyons provided).
+    **kwargs
+        Additional arguments passed to plot_profile()
+
+    Returns
+    -------
+    Figure, list[Axes]
+    """
+    if canyons is None:
+        canyons = get_canyons(profile, prominence=prominence, smooth=smooth)
+
+    if len(canyons) == 0:
+        logger.info("No canyons detected. Try adjusting prominence or smoothing.")
+        return plot_profile(profile, smooth=smooth, **kwargs)
+
+    fig, axes = plot_profile(profile, smooth=smooth, **kwargs)
+    ax = axes[-1]
+
+    for row in canyons.iter_rows(named=True):
+        floor_km = row["floor_distance"] / 1000
+        floor_elev = row["floor_elevation"]
+        shoulder_elev = floor_elev + row["depth"]
+        ws_km, we_km = row["width_start"] / 1000, row["width_end"] / 1000
+
+        ax.plot(floor_km, floor_elev, "ro", markersize=8, zorder=10)
+        ax.plot(
+            [ws_km, we_km],
+            [shoulder_elev] * 2,
+            "k--",
+            linewidth=1.5,
+            alpha=0.7,
+            zorder=5,
+        )
+        ax.plot(
+            [floor_km] * 2,
+            [floor_elev, shoulder_elev],
+            "k--",
+            linewidth=1.5,
+            alpha=0.7,
+            zorder=5,
+        )
+
+    return fig, axes
+
+
+def plot_profiles(
+    profiles: Profile | list[Profile],
+    show_map: bool = False,
+    normalize: bool = False,
+    ensure_descending: bool = False,
+    bathymetry_data: xr.DataArray | None = None,
+    cmap=cmo.deep_r,
+    **kwargs,
+) -> tuple[Figure, list[Axes]]:
+    """
+    Plot multiple profiles on the same axes.
+
+    Parameters
+    ----------
+    profiles : Profile or list[Profile]
+    show_map : bool
+        If True, show map with profile lines alongside the profile plot.
+        Requires bathymetry_data.
+    normalize : bool
+        If True, normalize each profile's elevation and distance to 0-1.
+    ensure_descending : bool
+        If True, orient profiles to descend from higher to lower elevation.
+    bathymetry_data : xr.DataArray, optional
+        Background data for map view.
+    **kwargs
+        Additional arguments passed to matplotlib plot()
+
+    Returns
+    -------
+    Figure, list[Axes]
+
+    Examples
+    --------
+    >>> from bathy.profile_plot import plot_profiles
+    >>> prof1 = extract_profile(data, start=(-8, 52), end=(-2, 58), name="Profile 1")
+    >>> prof2 = extract_profile(data, start=(-8, 53), end=(-2, 59), name="Profile 2")
+    >>> plot_profiles([prof1, prof2])
+    """
+    if isinstance(profiles, Profile):
+        profiles = [profiles]
+
+    if not profiles:
+        raise ValueError("Need at least one profile to plot")
+
+    if show_map:
+        fig, (ax_map, ax_profile) = plt.subplots(1, 2, figsize=(16, 6))
+
+        if bathymetry_data is not None:
+            extent = get_extent(bathymetry_data)
+            ax_map.imshow(
+                bathymetry_data.values,
+                cmap=cmap,
+                origin="lower",
+                extent=extent,
+                aspect="auto",
+                alpha=0.6,
+            )
+
+        for i, prof in enumerate(profiles, start=1):
+            label = prof.name if prof.name else f"Profile {i}"
+            path_lons = prof.metadata.get("path_lons", [prof.start_lon, prof.end_lon])
+            path_lats = prof.metadata.get("path_lats", [prof.start_lat, prof.end_lat])
+            ax_map.plot(path_lons, path_lats, "-", linewidth=2, label=label)
+            ax_map.plot(path_lons[0], path_lats[0], "o", markersize=6)
+            ax_map.plot(path_lons[-1], path_lats[-1], "s", markersize=6)
+
+        ax_map.set_xlabel("Longitude (°)")
+        ax_map.set_ylabel("Latitude (°)")
+        ax_map.legend()
+    else:
+        fig, ax_profile = plt.subplots(figsize=(12, 6))
+
+    for i, prof in enumerate(profiles, start=1):
+        distances = prof.distances.copy()
+        elevations = prof.elevations.copy()
+
+        if ensure_descending:
+            distances, elevations = _ensure_descending(distances, elevations)
+
+        if normalize:
+            distances, elevations = _normalise_profile(distances, elevations)
+
+        label = prof.name if prof.name else f"Profile {i}"
+        ax_profile.plot(distances, elevations, label=label, **kwargs)
+
+    ax_profile.set_xlabel("Normalized distance" if normalize else "Distance (km)")
+    ax_profile.set_ylabel("Normalized elevation" if normalize else "Elevation (m)")
+    ax_profile.grid(True, alpha=0.3)
+    ax_profile.legend()
+
+    if show_map:
+        return fig, [ax_map, ax_profile]
+    return fig, [ax_profile]
+
+
+def plot_profiles_grid(
+    profiles: Profile | list[Profile],
+    cols: int = 2,
+    figsize: tuple[float, float] | None = None,
+    main_profile: Profile | None = None,
+    smooth: float | None = None,
+    normalize: bool = False,
+    ensure_descending: bool = False,
+    **kwargs,
+) -> tuple[Figure, np.ndarray]:
+    """
+    Plot multiple profiles in a grid of subplots.
+
+    Parameters
+    ----------
+    profiles : Profile or list[Profile]
+    cols : int
+        Number of columns in the grid (default: 2)
+    figsize : tuple[float, float], optional
+        Figure size. Calculated if None.
+    main_profile : Profile, optional
+        Main profile; marks intersection with each cross-section.
+    smooth : float, optional
+        Gaussian smoothing sigma.
+    normalize : bool
+        If True, normalize each profile's elevation and distance to 0-1.
+    ensure_descending : bool
+        If True, orient profiles to descend from higher to lower elevation.
+    **kwargs
+        Additional arguments passed to matplotlib plot()
+
+    Returns
+    -------
+    Figure, np.ndarray
+
+    Examples
+    --------
+    >>> from bathy.profile_plot import plot_profiles_grid
+    >>> profiles = profiles_from_shapefile(data, "canyons.shp")
+    >>> plot_profiles_grid(profiles[:10])
+    """
+    if isinstance(profiles, Profile):
+        profiles = [profiles]
+
+    if not profiles:
+        raise ValueError("Need at least one profile to plot")
+
+    n_profiles = len(profiles)
+    rows = (n_profiles + cols - 1) // cols
+
+    if figsize is None:
+        figsize = (7 * cols, 3.5 * rows)
+
+    fig, axes = plt.subplots(rows, cols, figsize=figsize)
+    axes = np.atleast_1d(axes).flatten()
+
+    for i, prof in enumerate(profiles):
+        ax = axes[i]
+
+        elevations = (
+            gaussian_filter1d(prof.elevations, sigma=smooth)
+            if smooth
+            else prof.elevations.copy()
+        )
+        distances = prof.distances.copy()
+
+        if ensure_descending:
+            distances, elevations = _ensure_descending(distances, elevations)
+
+        if normalize:
+            distances, elevations = _normalise_profile(distances, elevations)
+
+        ylim = (float(elevations.min()), float(elevations.max()))
+        xlim = (float(distances.min()), float(distances.max()))
+
+        ax.plot(distances, elevations, **kwargs)
+        ax.fill_between(distances, elevations, elevations.min(), alpha=0.3)
+
+        if main_profile is not None:
+            mid_distance = distances[len(distances) // 2]
+            ax.axvline(
+                mid_distance,
+                color="black",
+                linestyle="-",
+                linewidth=1.5,
+                alpha=0.7,
+                zorder=10,
+            )
+
+        ax.set_xlabel("Normalized distance" if normalize else "Distance (km)")
+        ax.set_ylabel("Normalized elevation" if normalize else "Elevation (m)")
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        title = prof.name if prof.name else f"Profile {i + 1}"
+        ax.set_title(f"{title} ({prof.distances[-1]:.1f} km)")
+        ax.grid(True, alpha=0.3)
+
+    for i in range(n_profiles, len(axes)):
+        axes[i].set_visible(False)
+
+    plt.tight_layout()
+    return fig, axes
+
+
+def plot_profiles_map(
+    profiles: Profile | list[Profile],
+    bathymetry_data: xr.DataArray | None = None,
+    main_profile: Profile | None = None,
+    cmap=cmo.deep_r,
+    **kwargs,
+) -> tuple[Figure, Axes]:
+    """
+    Plot profile locations on a map.
+
+    Parameters
+    ----------
+    profiles : Profile or list[Profile]
+    bathymetry_data : xr.DataArray, optional
+        Background bathymetry data.
+    main_profile : Profile, optional
+        Main profile to highlight.
+    **kwargs
+        Additional arguments passed to matplotlib plot()
+
+    Returns
+    -------
+    Figure, Axes
+
+    Examples
+    --------
+    >>> from bathy.profile_plot import plot_profiles_map
+    >>> plot_profiles_map([prof1, prof2], bathymetry_data=data)
+    """
+    if isinstance(profiles, Profile):
+        profiles = [profiles]
+
+    if not profiles:
+        raise ValueError("Need at least one profile to plot")
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    if bathymetry_data is not None:
+        extent = get_extent(bathymetry_data)
+        ax.imshow(
+            bathymetry_data.values,
+            cmap=cmap,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            alpha=0.6,
+        )
+
+    for i, prof in enumerate(profiles, start=1):
+        label = prof.name if prof.name else f"Profile {i}"
+
+        if "path_lons" in prof.metadata and "path_lats" in prof.metadata:
+            lons = prof.metadata["path_lons"]
+            lats = prof.metadata["path_lats"]
+            ax.plot(lons, lats, "-", linewidth=2, label=label, **kwargs)
+            ax.plot(lons[0], lats[0], "o", markersize=8)
+            ax.plot(lons[-1], lats[-1], "s", markersize=8)
+        else:
+            ax.plot(
+                [prof.start_lon, prof.end_lon],
+                [prof.start_lat, prof.end_lat],
+                "-",
+                linewidth=2,
+                label=label,
+                **kwargs,
+            )
+            ax.plot(prof.start_lon, prof.start_lat, "o", markersize=8)
+            ax.plot(prof.end_lon, prof.end_lat, "s", markersize=8)
+
+    if main_profile is not None:
+        main_label = main_profile.name if main_profile.name else "Main Profile"
+        ax.plot(
+            [main_profile.start_lon, main_profile.end_lon],
+            [main_profile.start_lat, main_profile.end_lat],
+            "r-",
+            linewidth=3,
+            label=main_label,
+            zorder=10,
+        )
+        ax.plot(
+            main_profile.start_lon,
+            main_profile.start_lat,
+            "go",
+            markersize=10,
+            zorder=11,
+            label="Start",
+        )
+        ax.plot(
+            main_profile.end_lon,
+            main_profile.end_lat,
+            "rs",
+            markersize=10,
+            zorder=11,
+            label="End",
+        )
+
+    ax.set_xlabel("Longitude (°)")
+    ax.set_ylabel("Latitude (°)")
+    if any(p.name for p in profiles) or main_profile is not None:
+        ax.legend()
+
+    return fig, ax

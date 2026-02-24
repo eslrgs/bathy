@@ -14,21 +14,21 @@ bathy provides tools for loading, analysing, and visualising bathymetric (ocean 
 ## Quick example
 
 ```python
-from bathy import Bathymetry
+import bathy
 
 # Download data from GEBCO
-bath = Bathymetry.from_gebco_opendap(
+data = bathy.load_gebco_opendap(
     lon_range=(-12, -5),
     lat_range=(46, 50),
     save_path="data/celtic_sea.nc",
 )
 
 # Visualise
-bath.plot_bathy()
+bathy.plot_bathy(data)
 
 # Extract a profile
-profile = bath.profile(start=(-11, 48), end=(-6, 48))
-profile.plot()
+prof = bathy.extract_profile(data, start=(-11, 48), end=(-6, 48))
+bathy.plot_profile(prof)
 ```
 
 ## Installation

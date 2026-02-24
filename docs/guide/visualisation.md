@@ -1,13 +1,13 @@
 # Visualisation
 
-bathy provides a range of visualisation methods for bathymetric data.
+bathy provides a range of visualisation functions for bathymetric data. All `plot_*` functions return `(fig, ax)` so you can annotate, save, or compose figures.
 
 ## Elevation maps
 
 ### Basic bathymetry
 
 ```python
-bath.plot_bathy()
+bathy.plot_bathy(data)
 ```
 
 Uses the cmocean `deep` colormap (light = shallow, dark = deep).
@@ -16,16 +16,16 @@ Uses the cmocean `deep` colormap (light = shallow, dark = deep).
 
 ```python
 # Specific contour depths
-bath.plot_bathy(contours=[-200, -1000, -2000, -4000])
+bathy.plot_bathy(data, contours=[-200, -1000, -2000, -4000])
 
 # Number of contours
-bath.plot_bathy(contours=10)
+bathy.plot_bathy(data, contours=10)
 ```
 
 ### Custom colormap
 
 ```python
-bath.plot_bathy(cmap="viridis")
+bathy.plot_bathy(data, cmap="viridis")
 ```
 
 ## Terrain analysis
@@ -33,22 +33,22 @@ bath.plot_bathy(cmap="viridis")
 ### Hillshade
 
 ```python
-bath.plot_hillshade(azimuth=315, altitude=45)
+bathy.plot_hillshade(data, azimuth=315, altitude=45)
 ```
 
 ### Slope
 
 ```python
-bath.plot_slope()
+bathy.plot_slope(data)
 
 # Clip extreme values
-bath.plot_slope(vmax=20)  # Cap at 20 degrees
+bathy.plot_slope(data, vmax=20)  # Cap at 20 degrees
 ```
 
 ### Curvature
 
 ```python
-bath.plot_curvature()
+bathy.plot_curvature(data)
 ```
 
 Positive values indicate convex features (ridges), negative indicate concave features (valleys).
@@ -56,7 +56,7 @@ Positive values indicate convex features (ridges), negative indicate concave fea
 ### Bathymetric Position Index (BPI)
 
 ```python
-bath.plot_bpi(radius_km=2.0)
+bathy.plot_bpi(data, radius_km=2.0)
 ```
 
 BPI identifies ridges (positive) and valleys (negative) relative to the surrounding terrain. The `radius_km` parameter controls the neighbourhood size.
@@ -64,7 +64,7 @@ BPI identifies ridges (positive) and valleys (negative) relative to the surround
 ### Aspect
 
 ```python
-bath.plot_aspect()
+bathy.plot_aspect(data)
 ```
 
 Aspect is the compass direction of the steepest upslope gradient (0° = north, 90° = east, 180° = south, 270° = west). Uses a circular colormap so north is consistent at both ends of the scale. Flat areas are shown as NaN.
@@ -72,10 +72,10 @@ Aspect is the compass direction of the steepest upslope gradient (0° = north, 9
 ### Rugosity
 
 ```python
-bath.plot_rugosity(radius_km=1.0)
+bathy.plot_rugosity(data, radius_km=1.0)
 
 # Clip extreme values
-bath.plot_rugosity(vmax=0.05)
+bathy.plot_rugosity(data, vmax=0.05)
 ```
 
 Rugosity (Vector Ruggedness Measure) quantifies terrain complexity. Values range from 0 (flat) to 1 (maximally rough). Higher values indicate structurally complex seabed — useful for identifying hard substrate and reef habitat. The `radius_km` parameter controls the neighbourhood size.
@@ -83,10 +83,10 @@ Rugosity (Vector Ruggedness Measure) quantifies terrain complexity. Values range
 ### Geomorphons
 
 ```python
-bath.plot_geomorphons(lookup_km=2.0)
+bathy.plot_geomorphons(data, lookup_km=2.0)
 
 # Finer scale with tighter flatness threshold
-bath.plot_geomorphons(lookup_km=1.0, flatness_threshold=0.5)
+bathy.plot_geomorphons(data, lookup_km=1.0, flatness_threshold=0.5)
 ```
 
 Geomorphons classify terrain into 10 morphological forms (flat, peak, ridge, shoulder, spur, slope, hollow, footslope, valley, pit) by comparing each cell to eight neighbours at the lookup distance. Colours follow a warm (elevated) → grey (neutral) → cool (depressed) scheme. The `lookup_km` parameter controls the scale of analysis; larger values capture broader landscape forms.
@@ -95,13 +95,13 @@ Geomorphons classify terrain into 10 morphological forms (flat, peak, ridge, sho
 
 ```python
 # All eight terrain analyses in one figure
-bath.plot_overview()
+bathy.plot_overview(data)
 
 # Custom neighbourhood scales
-bath.plot_overview(bpi_radius_km=2.0, rugosity_radius_km=2.0, geomorphons_lookup_km=5.0)
+bathy.plot_overview(data, bpi_radius_km=2.0, rugosity_radius_km=2.0, geomorphons_lookup_km=5.0)
 ```
 
-Displays bathymetry, hillshade, slope, aspect, curvature, BPI, rugosity, and geomorphons in a single 4 x 2 figure. Useful for a quick scan of all key bathymetric characteristics.
+Displays bathymetry, hillshade, slope, aspect, curvature, BPI, rugosity, and geomorphons in a single 4 × 2 figure. Useful for a quick scan of all key bathymetric characteristics.
 
 ## Depth zones
 
@@ -109,10 +109,11 @@ Classify bathymetry into depth zones:
 
 ```python
 # Default zones: shelf, slope, abyss, deep
-bath.plot_depth_zones()
+bathy.plot_depth_zones(data)
 
 # Custom zones
-bath.plot_depth_zones(
+bathy.plot_depth_zones(
+    data,
     zones=[0, -200, -2000, -6000],
     labels=["Shelf", "Slope", "Abyss", "Hadal"],
 )
@@ -123,19 +124,20 @@ bath.plot_depth_zones(
 ### Histogram
 
 ```python
-bath.plot_histogram(bins=100)
+bathy.plot_histogram(data, bins=100)
 ```
 
 ### Hypsometric curve
 
 ```python
-bath.plot_hypsometric_curve()
+bathy.plot_hypsometric_curve(data)
 ```
 
 ## 3D surface
 
 ```python
-bath.plot_surface3d(
+bathy.plot_surface3d(
+    data,
     stride=10,                 # Downsample factor
     vertical_exaggeration=50,  # Z-axis scaling
     smooth=5,                  # Optional smoothing
@@ -146,10 +148,17 @@ bath.plot_surface3d(
 
 ## Contours on any plot
 
-All plot methods support the `contours` parameter:
+All plot functions support the `contours` parameter:
 
 ```python
-bath.plot_hillshade(contours=[-200, -4000])
-bath.plot_slope(contours=5)
-bath.plot_depth_zones(contours=[-200, -1000])
+bathy.plot_hillshade(data, contours=[-200, -4000])
+bathy.plot_slope(data, contours=5)
+bathy.plot_depth_zones(data, contours=[-200, -1000])
+```
+
+## Saving figures
+
+```python
+fig, ax = bathy.plot_bathy(data)
+fig.savefig("bathymetry.png", dpi=300, bbox_inches="tight")
 ```
