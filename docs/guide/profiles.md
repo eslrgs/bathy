@@ -2,6 +2,21 @@
 
 Bathymetric profiles allow you to analyse depth variations along a transect.
 
+## Interactive drawing
+
+Draw profiles by clicking directly on the map (requires `%matplotlib widget` in Jupyter):
+
+```python
+%matplotlib widget
+import bathy
+
+data = bathy.load_gebco_opendap(lon_range=(-12, -4), lat_range=(50, 56))
+result = bathy.draw_profile(data)
+# Left-click to add waypoints, right-click to finish each profile
+# Double-click to stop drawing
+result["profiles"]  # list of drawn Profile objects
+```
+
 ## Creating profiles
 
 ### From coordinates
@@ -55,7 +70,7 @@ Features outside the DEM extent are skipped automatically. Any non-geometry colu
 ### Basic statistics
 
 ```python
-bathy.stats(prof)
+bathy.profile_stats(prof)
 ```
 
 ### Maximum depth
@@ -120,6 +135,9 @@ bathy.plot_canyons(prof, prominence=500)
 ### With knickpoints
 
 ```python
+bathy.plot_knickpoints(prof)
+
+# Or with pre-computed knickpoints
 kp = bathy.knickpoints(prof)
 bathy.plot_knickpoints(prof, kp)
 ```

@@ -15,6 +15,7 @@ from bathy.analysis import (
     slope,
     summary,
 )
+from bathy.interactive import draw_profile
 from bathy.io import (
     list_regions,
     load_bathymetry,
@@ -115,6 +116,8 @@ __all__ = [
     "plot_knickpoints",
     "plot_gradient",
     "plot_canyons",
+    # Interactive
+    "draw_profile",
     # Submodule
     "profile",
     "__version__",

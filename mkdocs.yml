@@ -52,6 +52,7 @@ nav:
       - Analysis: api/analysis.md
       - Plotting: api/plot.md
       - Profile: api/profile.md
+      - Interactive: api/interactive.md
 
 markdown_extensions:
   - pymdownx.highlight:
