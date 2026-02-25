@@ -18,6 +18,7 @@ from bathy.profile import (
     _normalise_profile,
     get_canyons,
     gradient,
+    knickpoints,
 )
 
 logger = logging.getLogger(__name__)
@@ -114,7 +115,11 @@ def plot_profile(
 
 
 def plot_knickpoints(
-    profile: Profile, knickpoints_df: pl.DataFrame, **kwargs
+    profile: Profile,
+    knickpoints_df: pl.DataFrame | None = None,
+    threshold: float | None = None,
+    smooth: float | None = None,
+    **kwargs,
 ) -> tuple[Figure, list[Axes]]:
     """
     Plot profile with knickpoints marked.
@@ -122,8 +127,12 @@ def plot_knickpoints(
     Parameters
     ----------
     profile : Profile
-    knickpoints_df : pl.DataFrame
-        Result from knickpoints()
+    knickpoints_df : pl.DataFrame, optional
+        Knickpoint data from knickpoints(). Detected if None.
+    threshold : float, optional
+        Minimum slope break for detection (ignored if knickpoints_df provided).
+    smooth : float, optional
+        Smoothing sigma (ignored if knickpoints_df provided).
     **kwargs
         Additional arguments passed to plot_profile
 
@@ -131,7 +140,15 @@ def plot_knickpoints(
     -------
     Figure, list[Axes]
     """
+    if knickpoints_df is None:
+        knickpoints_df = knickpoints(profile, threshold=threshold, smooth=smooth)
+
     fig, axes = plot_profile(profile, **kwargs)
+
+    if len(knickpoints_df) == 0:
+        logger.info("No knickpoints detected. Try adjusting threshold or smoothing.")
+        return fig, axes
+
     axes[-1].scatter(
         knickpoints_df["distance_km"],
         knickpoints_df["depth_m"],
