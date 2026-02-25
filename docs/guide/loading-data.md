@@ -7,9 +7,9 @@ bathy supports multiple data sources and formats for bathymetric data.
 You can download data directly from the GEBCO global bathymetry dataset via OPeNDAP:
 
 ```python
-from bathy import Bathymetry
+import bathy
 
-bath = Bathymetry.from_gebco_opendap(
+data = bathy.load_gebco_opendap(
     lon_range=(-12, -5),
     lat_range=(46, 50),
     year=2025,  # GEBCO version year
@@ -26,15 +26,15 @@ If `save_path` is provided and the file already exists, bathy will load from the
 Common oceanographic regions are available as presets:
 
 ```python
-from bathy import list_regions
+import bathy
 
 # List all available regions
-regions = list_regions()
+regions = bathy.list_regions()
 print(regions[:10])
-# ['antarctic', 'arabian_sea', 'arctic', 'baltic_sea', ...]
+# ['arabian_sea', 'baltic_sea', 'bay_of_bengal', 'black_sea', ...]
 
 # Use a preset
-bath = Bathymetry.from_gebco_opendap(region="mediterranean")
+data = bathy.load_gebco_opendap(region="mediterranean")
 ```
 
 ## Local NetCDF files
@@ -42,7 +42,7 @@ bath = Bathymetry.from_gebco_opendap(region="mediterranean")
 Load from local NetCDF files (e.g., downloaded GEBCO data):
 
 ```python
-bath = Bathymetry(
+data = bathy.load_bathymetry(
     "path/to/gebco_2025.nc",
     lon_range=(-10, -5),
     lat_range=(50, 55),
@@ -57,26 +57,40 @@ bath = Bathymetry(
 Load from GeoTIFF rasters:
 
 ```python
-bath = Bathymetry("path/to/bathymetry.tif")
+data = bathy.load_bathymetry("path/to/bathymetry.tif")
 ```
 
 GeoTIFF files are loaded using rioxarray with automatic coordinate renaming.
+
+## Clipping to a region
+
+`data` is an `xr.DataArray`, so xarray's standard selection works directly:
+
+```python
+subset = data.sel(lon=slice(-10, -7), lat=slice(47, 49))
+```
 
 ## Exporting data
 
 ### To GeoTIFF
 
 ```python
-bath.to_geotiff("output.tif", crs="EPSG:4326")
+bathy.to_geotiff(data, "output.tif", crs="EPSG:4326")
 ```
 
-## Data properties
-
-After loading, you can inspect the data:
+### To NetCDF
 
 ```python
-print(bath.shape)       # Grid dimensions
-print(bath.lon_range)   # Longitude bounds
-print(bath.lat_range)   # Latitude bounds
-print(bath)             # Summary representation
+data.to_netcdf("output.nc")
+```
+
+## Inspecting data
+
+`data` is a standard `xr.DataArray` — use xarray directly:
+
+```python
+print(data.shape)           # Grid dimensions
+print(data.coords["lon"])   # Longitude coordinate
+print(data.coords["lat"])   # Latitude coordinate
+data                        # Rich repr in Jupyter
 ```

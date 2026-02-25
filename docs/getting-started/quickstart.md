@@ -9,9 +9,9 @@ This guide covers the basics of loading bathymetry data and creating visualisati
 The easiest way to get started is to download data directly from the GEBCO OPeNDAP server:
 
 ```python
-from bathy import Bathymetry
+import bathy
 
-bath = Bathymetry.from_gebco_opendap(
+data = bathy.load_gebco_opendap(
     lon_range=(-12, -5),
     lat_range=(46, 50),
     save_path="data/my_region.nc",  # Optional: save for reuse
@@ -25,13 +25,13 @@ If `save_path` exists, the download is skipped and data is loaded from the file.
 For convenience, common oceanographic regions are available:
 
 ```python
-from bathy import Bathymetry, list_regions
+import bathy
 
 # See available regions
-print(list_regions())
+print(bathy.list_regions())
 
 # Load a preset region
-bath = Bathymetry.from_gebco_opendap(region="mediterranean")
+data = bathy.load_gebco_opendap(region="mediterranean")
 ```
 
 ### From local files
@@ -40,29 +40,37 @@ Load from NetCDF or GeoTIFF:
 
 ```python
 # NetCDF
-bath = Bathymetry("path/to/gebco.nc", lon_range=(-10, -5), lat_range=(50, 55))
+data = bathy.load_bathymetry("path/to/gebco.nc", lon_range=(-10, -5), lat_range=(50, 55))
 
 # GeoTIFF
-bath = Bathymetry("path/to/bathymetry.tif")
+data = bathy.load_bathymetry("path/to/bathymetry.tif")
 ```
 
 ## Basic visualisation
 
 ```python
 # Elevation map
-bath.plot_bathy()
+bathy.plot_bathy(data)
 
 # With contours
-bath.plot_bathy(contours=[-200, -1000, -2000, -4000])
+bathy.plot_bathy(data, contours=[-200, -1000, -2000, -4000])
 
 # Hillshade
-bath.plot_hillshade()
+bathy.plot_hillshade(data)
 
 # Slope map
-bath.plot_slope()
+bathy.plot_slope(data)
 
 # Depth zones
-bath.plot_depth_zones()
+bathy.plot_depth_zones(data)
+```
+
+All plot functions return `(fig, ax)` so you can annotate or save:
+
+```python
+fig, ax = bathy.plot_bathy(data)
+ax.set_title("Celtic Sea")
+fig.savefig("celtic_sea.png", dpi=300)
 ```
 
 ## Creating profiles
@@ -71,7 +79,8 @@ Extract a bathymetric profile between two points:
 
 ```python
 # Create profile with 1 km point spacing
-profile = bath.profile(
+prof = bathy.extract_profile(
+    data,
     start=(-11, 48),
     end=(-6, 48),
     point_spacing=1.0,
@@ -79,25 +88,19 @@ profile = bath.profile(
 )
 
 # Plot the profile
-profile.plot()
+bathy.plot_profile(prof)
 
 # Get statistics
-profile.stats()
+bathy.stats(prof)
 ```
 
 ## Summary statistics
 
 ```python
-# Overall statistics
-bath.summary()
-
-# Depth statistics (underwater only)
-bath.depth_stats()
-
-# Land/sea coverage
-bath.coverage()
+# Overall statistics (delegates to xarray describe)
+bathy.summary(data)
 
 # Hypsometric index
-hi = bath.hypsometric_index()
+hi = bathy.hypsometric_index(data)
 print(f"Hypsometric Index: {hi:.3f}")
 ```

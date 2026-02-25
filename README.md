@@ -1,4 +1,4 @@
-# 🌐 bathy
+# bathy
 
 ![Status](https://img.shields.io/badge/status-experimental-red)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://eslrgs.github.io/bathy)
@@ -10,39 +10,39 @@ Python package for exploring bathymetric grids.
 ## Basic usage
 
 ```python
-from bathy import Bathymetry
+import bathy
 
 # Load from file
-bath = Bathymetry('GEBCO_2025.nc', lon_range=(-10, 0), lat_range=(50, 60))
+data = bathy.load_bathymetry("GEBCO_2025.nc", lon_range=(-10, 0), lat_range=(50, 60))
 
-# Or download GEBCO data via CEDA
-bath = Bathymetry.from_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
+# Or download GEBCO data via OPeNDAP
+data = bathy.load_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
 
 # Analyse
-stats = bath.summary()
-coverage = bath.coverage()
+bathy.summary(data)
+bathy.slope(data)
 
-# Visualize
-bath.plot_bathy()
-bath.plot_slope()
-bath.plot_depth_zones()
+# Visualise
+bathy.plot_bathy(data)
+bathy.plot_slope(data)
+bathy.plot_depth_zones(data)
 
 # Profiles
-prof = bath.profile((-8, 52), (-2, 58))
-prof.stats()
-prof.plot()
+prof = bathy.extract_profile(data, (-8, 52), (-2, 58), name="Celtic Sea")
+bathy.stats(prof)
+bathy.plot_profile(prof)
 
 # Canyon analysis
-canyons = prof.get_canyons(prominence=100)
-prof.plot_canyons(prominence=100)
+canyons = bathy.get_canyons(prof, prominence=100)
+bathy.plot_canyons(prof, prominence=100)
 
 # Multiple profiles
-from bathy import profile
-
-prof1 = bath.profile((-8, 52), (-2, 58), name="Profile 1")
-prof2 = bath.profile((-8, 53), (-2, 59), name="Profile 2")
-profile.plot_profiles([prof1, prof2])
-profile.compare_stats([prof1, prof2])
+profiles = [
+    bathy.extract_profile(data, (-8, lat), (-2, lat + 6), name=f"{lat}N")
+    for lat in [52, 53, 54]
+]
+bathy.plot_profiles(profiles)
+bathy.compare_stats(profiles)
 ```
 
 ## Installation
@@ -53,30 +53,34 @@ uv pip install .
 
 ## Features
 
-**Bathymetry class:**
-- Analysis: `summary()`, `depth_stats()`, `coverage()`, `slope()`, `aspect()`, `curvature()`, `bpi()`, `rugosity()`, `geomorphons()`, `hypsometric_index()`, `hypsometric_curve()`
-- Plotting: `plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_aspect()`, `plot_curvature()`, `plot_bpi()`, `plot_rugosity()`, `plot_geomorphons()`, `plot_overview()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`
-- Profiles: `profile()`
+**IO:**
+`load_bathymetry()`, `load_gebco_opendap()`, `to_geotiff()`, `list_regions()`
 
-**Profile class:**
-- Analysis: `stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`
-- I/O: `from_coordinates()`, `from_shapefile()`, `from_gdf()`, `cross_sections()`
-- Plotting: `plot()`, `plot_gradient()`, `plot_canyons()`, `plot_knickpoints()`
+**Analysis:**
+`summary()`, `slope()`, `aspect()`, `curvature()`, `bpi()`, `rugosity()`, `geomorphons()`, `hypsometric_index()`, `hypsometric_curve()`
 
-**Multi-profile functions (profile module):**
-- Analysis: `compare_stats()`, `to_gdf()`
-- Plotting: `plot_profiles()`, `plot_profiles_grid()`, `plot_profiles_map()`
+**Plotting:**
+`plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_aspect()`, `plot_curvature()`, `plot_bpi()`, `plot_rugosity()`, `plot_geomorphons()`, `plot_overview()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`, `plot_hypsometric_curve()`
+
+**Profile construction:**
+`extract_profile()`, `profile_from_coordinates()`, `cross_sections()`, `profiles_from_shapefile()`, `profiles_from_gdf()`
+
+**Profile analysis:**
+`stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`, `compare_stats()`, `to_gdf()`
+
+**Profile plotting:**
+`plot_profile()`, `plot_profiles()`, `plot_profiles_grid()`, `plot_profiles_map()`, `plot_gradient()`, `plot_knickpoints()`, `plot_canyons()`
 
 ## Preset regions
 
-32 preset regions available:
+28 preset regions available:
 
 ```python
-from bathy import list_regions, Bathymetry
+import bathy
 
-list_regions()  # ['antarctic', 'arabian_sea', 'arctic', ...]
+bathy.list_regions()  # ['arabian_sea', 'baltic_sea', 'bay_of_bengal', ...]
 
-bath = Bathymetry('GEBCO_2023.nc', region='mediterranean')
+data = bathy.load_gebco_opendap(region="mediterranean")
 ```
 
 ## Examples

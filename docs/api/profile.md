@@ -1,26 +1,25 @@
 # Profile
 
+## Data class
+
 ::: bathy.Profile
-    options:
-      members:
-        - __init__
-        - from_coordinates
-        - from_shapefile
-        - from_gdf
-        - cross_sections
-        - stats
-        - max_depth
-        - gradient
-        - get_canyons
-        - knickpoints
-        - plot
-        - plot_canyons
-        - plot_knickpoints
 
-## Profile utilities
+## Construction
 
-::: bathy.profile.to_gdf
-::: bathy.profile.plot_profiles
-::: bathy.profile.plot_profiles_map
-::: bathy.profile.plot_profiles_grid
-::: bathy.profile.compare_stats
+::: bathy.extract_profile
+::: bathy.profile_from_coordinates
+::: bathy.cross_sections
+::: bathy.profiles_from_shapefile
+::: bathy.profiles_from_gdf
+
+## Analysis
+
+::: bathy.profile_stats
+::: bathy.max_depth
+::: bathy.gradient
+::: bathy.concavity_index
+::: bathy.knickpoints
+::: bathy.get_canyons
+::: bathy.compare_stats
+::: bathy.to_gdf
+
