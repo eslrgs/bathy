@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
@@ -104,7 +105,7 @@ def _ensure_descending(
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
-        (distances, elevations) - flipped and re-zeroed if start elevation
+        (distances, elevations) — flipped and re-zeroed if start elevation
         < end elevation
     """
     if elevations[0] < elevations[-1]:
@@ -152,27 +153,33 @@ def _extract_profile_arrays(
     n: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Extract elevation and distance arrays along a straight-line profile.
+    Extract elevation and distance arrays along a geodesic profile.
+
+    Points are placed at equal geodesic intervals along the great-circle
+    path between start and end coordinates.
 
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
-        (elevations, distances) arrays
+        (elevations, distances_km) arrays
     """
-    lons = np.linspace(start_lon, end_lon, n)
-    lats = np.linspace(start_lat, end_lat, n)
+    geod = Geodesic.WGS84
+    line = geod.InverseLine(start_lat, start_lon, end_lat, end_lon)
+    total_m = line.s13
+    distances_km = np.linspace(0, total_m / 1000, n)
+
+    lons = np.zeros(n)
+    lats = np.zeros(n)
+    for i, d_km in enumerate(distances_km):
+        pos = line.Position(d_km * 1000)
+        lons[i] = pos["lon2"]
+        lats[i] = pos["lat2"]
 
     lon_da = xr.DataArray(lons, dims="points")
     lat_da = xr.DataArray(lats, dims="points")
     elevations = data.sel(lon=lon_da, lat=lat_da, method="nearest").values.astype(float)
 
-    geod = Geodesic.WGS84
-    distances = np.zeros(n)
-    for i in range(1, n):
-        result = geod.Inverse(lats[i - 1], lons[i - 1], lats[i], lons[i])
-        distances[i] = distances[i - 1] + result["s12"] / 1000
-
-    return elevations, distances
+    return elevations, distances_km
 
 
 def _find_crossing_m(
@@ -192,7 +199,21 @@ def _find_crossing_m(
 def _normalise_profile(
     distances: np.ndarray, elevations: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Normalise distances and elevations to [0, 1]."""
+    """
+    Normalise distances and elevations to [0, 1].
+
+    Parameters
+    ----------
+    distances : np.ndarray
+        Distance values along profile
+    elevations : np.ndarray
+        Elevation values along profile
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        (distances, elevations) normalised to [0, 1]
+    """
     elev_min, elev_max = float(elevations.min()), float(elevations.max())
     if elev_max > elev_min:
         elevations = (elevations - elev_min) / (elev_max - elev_min)
@@ -434,7 +455,7 @@ def cross_sections(
 
 def profiles_from_shapefile(
     data: xr.DataArray,
-    shapefile_path: str,
+    shapefile_path: str | Path,
     id_column: str | None = None,
 ) -> list[Profile]:
     """
@@ -548,7 +569,7 @@ def profiles_from_gdf(
 # ============================================================================
 
 
-def stats(profile: Profile) -> pl.DataFrame:
+def profile_stats(profile: Profile) -> pl.DataFrame:
     """
     Calculate statistics for the profile.
 
@@ -579,7 +600,7 @@ def stats(profile: Profile) -> pl.DataFrame:
                 float(np.mean(profile.elevations)),
                 float(np.median(profile.elevations)),
                 float(np.std(profile.elevations)),
-                float(np.ptp(profile.elevations)),
+                float(np.max(profile.elevations) - np.min(profile.elevations)),
             ],
         }
     )
@@ -838,7 +859,7 @@ def compare_stats(profiles: list[Profile]) -> pl.DataFrame:
     if not profiles:
         raise ValueError("Need at least one profile to compare")
 
-    all_stats = [stats(prof) for prof in profiles]
+    all_stats = [profile_stats(prof) for prof in profiles]
     result: dict[str, list] = {"statistic": all_stats[0]["statistic"].to_list()}
     for i, (prof, prof_stats) in enumerate(zip(profiles, all_stats), start=1):
         name = prof.name or f"Profile_{i}"

@@ -6,9 +6,14 @@ import pytest
 from shapely.geometry import LineString
 
 from bathy.profile import (
+    Profile,
     _ensure_descending,
+    concavity_index,
+    cross_sections,
     extract_profile,
     knickpoints,
+    profile_from_coordinates,
+    profile_stats,
     profiles_from_gdf,
     to_gdf,
 )
@@ -229,3 +234,103 @@ def test_to_gdf_empty_raises():
     """to_gdf raises ValueError for empty list."""
     with pytest.raises(ValueError):
         to_gdf([])
+
+
+# profile_from_coordinates
+
+
+def test_profile_from_coordinates(fake_data):
+    """Create profile from coordinate list."""
+    coords = [(-9, 52), (-8, 52.5), (-7, 53)]
+    prof = profile_from_coordinates(fake_data, coords, name="Curved")
+
+    assert prof.name == "Curved"
+    assert len(prof.distances) == 3
+    assert len(prof.elevations) == 3
+    assert prof.distances[0] == 0
+    assert np.all(np.diff(prof.distances) > 0)
+    assert prof.start_lon == -9
+    assert prof.end_lon == -7
+
+
+def test_profile_from_coordinates_too_few():
+    """Fewer than 2 coordinates raises ValueError."""
+    import xarray as xr
+
+    data = xr.DataArray(
+        np.zeros((10, 10)),
+        coords={"lon": np.linspace(-10, -5, 10), "lat": np.linspace(50, 55, 10)},
+        dims=["lat", "lon"],
+    )
+    with pytest.raises(ValueError):
+        profile_from_coordinates(data, [(-9, 52)])
+
+
+# cross_sections
+
+
+def test_cross_sections(fake_data):
+    """Cross-sections are generated at expected intervals."""
+    prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=20)
+    total_dist = prof.distances[-1]
+
+    sections = cross_sections(
+        fake_data, prof, interval_km=total_dist / 2, section_width_km=50
+    )
+
+    assert len(sections) >= 2
+    for s in sections:
+        assert len(s.distances) > 0
+        assert s.distances[0] == 0
+
+
+def test_cross_sections_invalid_interval(fake_data, fake_profile):
+    """Negative interval raises ValueError."""
+    with pytest.raises(ValueError):
+        cross_sections(fake_data, fake_profile, interval_km=-1, section_width_km=10)
+
+
+# concavity_index
+
+
+def test_concavity_index_straight():
+    """Straight-line profile has concavity index near zero."""
+    prof = Profile(
+        distances=np.linspace(0, 100, 50),
+        elevations=np.linspace(0, -1000, 50),
+        start_lon=0,
+        start_lat=0,
+        end_lon=1,
+        end_lat=1,
+    )
+    ci = concavity_index(prof)
+    assert abs(ci) < 0.01
+
+
+def test_concavity_index_concave():
+    """Concave profile has positive concavity index."""
+    x = np.linspace(0, 100, 50)
+    elevations = -(x**2) / 100
+    prof = Profile(
+        distances=x,
+        elevations=elevations,
+        start_lon=0,
+        start_lat=0,
+        end_lon=1,
+        end_lat=1,
+    )
+    ci = concavity_index(prof)
+    assert ci > 0
+
+
+# profile_stats
+
+
+def test_profile_stats(fake_profile):
+    """profile_stats returns DataFrame with expected statistics."""
+    result = profile_stats(fake_profile)
+    assert "statistic" in result.columns
+    assert "value" in result.columns
+    stats_names = result["statistic"].to_list()
+    assert "total_distance" in stats_names
+    assert "min_elevation" in stats_names

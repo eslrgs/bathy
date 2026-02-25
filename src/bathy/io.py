@@ -3,10 +3,10 @@
 import logging
 import os
 import tempfile
+from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-import rioxarray
 import xarray as xr
 from tqdm import tqdm
 
@@ -140,11 +140,13 @@ def _download_gebco(
 
 
 def _load_geotiff(
-    filepath: str,
+    filepath: str | Path,
     lon_range: tuple[float, float] | None,
     lat_range: tuple[float, float] | None,
 ) -> xr.DataArray:
     """Load GeoTIFF file with rioxarray."""
+    import rioxarray  # noqa: PLC0415
+
     da = rioxarray.open_rasterio(filepath, masked=True)
 
     if "band" in da.dims:
@@ -222,7 +224,7 @@ def _load_netcdf(
 
 
 def load_bathymetry(
-    filepath: str,
+    filepath: str | Path,
     lon_range: tuple[float, float] | None = None,
     lat_range: tuple[float, float] | None = None,
     region: str | None = None,
@@ -340,7 +342,7 @@ def load_gebco_opendap(
 
 def to_geotiff(
     data: xr.DataArray,
-    filepath: str,
+    filepath: str | Path,
     crs: str = "EPSG:4326",
     **kwargs,
 ) -> None:
@@ -351,7 +353,7 @@ def to_geotiff(
     ----------
     data : xr.DataArray
         Elevation data
-    filepath : str
+    filepath : str or Path
         Output GeoTIFF file path
     crs : str, default 'EPSG:4326'
         Coordinate reference system
@@ -362,6 +364,7 @@ def to_geotiff(
     --------
     >>> to_geotiff(data, 'output.tif')
     """
+
     if data.rio.crs is None:
         data = data.rio.write_crs(crs)
     data.rio.to_raster(filepath, **kwargs)

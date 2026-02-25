@@ -14,7 +14,7 @@
 
 ## Analysis
 
-::: bathy.stats
+::: bathy.profile_stats
 ::: bathy.max_depth
 ::: bathy.gradient
 ::: bathy.concavity_index

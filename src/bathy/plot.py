@@ -7,7 +7,6 @@ import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.figure import Figure
-from xrspatial import hillshade
 
 from bathy.analysis import (
     _GEOMORPHON_COLORS,
@@ -21,7 +20,41 @@ from bathy.analysis import (
     rugosity,
     slope,
 )
-from bathy.utils import get_extent
+
+
+def get_extent(data: xr.DataArray) -> list[float]:
+    """
+    Get extent for matplotlib imshow.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Data array with lon and lat coordinates
+
+    Returns
+    -------
+    list[float]
+        Extent as [lon_min, lon_max, lat_min, lat_max]
+    """
+    return [
+        float(data.lon.min()),
+        float(data.lon.max()),
+        float(data.lat.min()),
+        float(data.lat.max()),
+    ]
+
+
+def _hillshade(
+    data: xr.DataArray, azimuth: float = 315, altitude: float = 45
+) -> np.ndarray:
+    """Compute hillshade using Horn's method (operates on negated elevations)."""
+    gy, gx = np.gradient(-data.values.astype(float))
+    az_rad = np.radians(360 - azimuth + 90)
+    alt_rad = np.radians(altitude)
+    shaded = (
+        np.sin(alt_rad) + np.cos(alt_rad) * (np.cos(az_rad) * gx + np.sin(az_rad) * gy)
+    ) / np.sqrt(1 + gx**2 + gy**2)
+    return np.clip(shaded, 0, 1)
 
 
 def _add_contours(
@@ -40,10 +73,42 @@ def _add_contours(
     ax.clabel(cs, inline=True, fontsize=8)
 
 
+def _plot_grid(
+    values: np.ndarray,
+    data: xr.DataArray,
+    cmap,
+    label: str,
+    contours: int | list[float] | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    **kwargs,
+) -> tuple[Figure, Axes]:
+    """Plot a 2-D grid with colorbar, optional contours, and axis labels."""
+    extent = get_extent(data)
+    fig, ax = plt.subplots(figsize=(10, 8))
+    im = ax.imshow(
+        values,
+        cmap=cmap,
+        origin="lower",
+        extent=extent,
+        aspect="auto",
+        vmin=vmin,
+        vmax=vmax,
+        **kwargs,
+    )
+    plt.colorbar(im, ax=ax, label=label)
+    if contours is not None:
+        _add_contours(data, ax, contours)
+    ax.set_xlabel("Longitude (°)")
+    ax.set_ylabel("Latitude (°)")
+    return fig, ax
+
+
 def plot_bathy(
     data: xr.DataArray,
     contours: int | list[float] | None = None,
     cmap=None,
+    mask_land: bool = True,
     **kwargs,
 ) -> tuple[Figure, Axes]:
     """
@@ -57,15 +122,22 @@ def plot_bathy(
         Number of contour levels or specific levels (in metres)
     cmap : str or Colormap, optional
         Colormap. Defaults to cmocean 'deep_r'.
+    mask_land : bool, default True
+        If True, mask positive elevations (land).
     **kwargs
         Additional arguments passed to xarray plot
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     if cmap is None:
         cmap = cmo.deep_r
 
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    data_masked = data.where(data < 0)
+    data_masked = data.where(data < 0) if mask_land else data
 
     if "cbar_kwargs" not in kwargs:
         kwargs["cbar_kwargs"] = {"label": "Elevation (m)"}
@@ -102,8 +174,13 @@ def plot_hillshade(
         Contour levels
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
-    shaded = hillshade(-data, azimuth=azimuth, angle_altitude=altitude)
+    shaded = _hillshade(data, azimuth=azimuth, altitude=altitude)
     extent = get_extent(data)
 
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -138,32 +215,25 @@ def plot_slope(
         Maximum slope value for colour scale.
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     slope_data = slope(data)
-    extent = get_extent(data)
-
     if vmax is None:
         vmax = float(np.nanpercentile(slope_data.values, 99))
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-    im = ax.imshow(
+    return _plot_grid(
         slope_data.values,
-        cmap="Greys",
-        origin="lower",
-        extent=extent,
-        aspect="auto",
+        data,
+        "Greys",
+        "Slope (°)",
+        contours=contours,
         vmin=0,
         vmax=vmax,
         **kwargs,
     )
-    plt.colorbar(im, ax=ax, label="Slope (°)")
-
-    if contours is not None:
-        _add_contours(data, ax, contours)
-
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
-    return fig, ax
 
 
 def plot_curvature(
@@ -182,31 +252,24 @@ def plot_curvature(
         Contour levels
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     curvature_data = curvature(data)
-    extent = get_extent(data)
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-
     vmax = np.nanmax(np.abs(curvature_data.values))
-    im = ax.imshow(
+    return _plot_grid(
         curvature_data.values,
-        cmap=cmo.balance,
-        origin="lower",
-        extent=extent,
-        aspect="auto",
+        data,
+        cmo.balance,
+        "Curvature",
+        contours=contours,
         vmin=-vmax,
         vmax=vmax,
         **kwargs,
     )
-    plt.colorbar(im, ax=ax, label="Curvature")
-
-    if contours is not None:
-        _add_contours(data, ax, contours)
-
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
-    return fig, ax
 
 
 def plot_bpi(
@@ -228,31 +291,24 @@ def plot_bpi(
         Contour levels
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     bpi_data = bpi(data, radius_km)
-    extent = get_extent(data)
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-
     vmax = np.nanmax(np.abs(bpi_data.values))
-    im = ax.imshow(
+    return _plot_grid(
         bpi_data.values,
-        cmap=cmo.balance,
-        origin="lower",
-        extent=extent,
-        aspect="auto",
+        data,
+        cmo.balance,
+        f"BPI (r={radius_km} km)",
+        contours=contours,
         vmin=-vmax,
         vmax=vmax,
         **kwargs,
     )
-    plt.colorbar(im, ax=ax, label=f"BPI (r={radius_km} km)")
-
-    if contours is not None:
-        _add_contours(data, ax, contours)
-
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
-    return fig, ax
 
 
 def plot_rugosity(
@@ -277,32 +333,25 @@ def plot_rugosity(
         Maximum VRM value for colour scale.
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     rug_data = rugosity(data, radius_km)
-    extent = get_extent(data)
-
     if vmax is None:
         vmax = float(np.nanpercentile(rug_data.values, 99))
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-    im = ax.imshow(
+    return _plot_grid(
         rug_data.values,
-        cmap=cmo.amp,
-        origin="lower",
-        extent=extent,
-        aspect="auto",
+        data,
+        cmo.amp,
+        f"Rugosity VRM (r={radius_km} km)",
+        contours=contours,
         vmin=0,
         vmax=vmax,
         **kwargs,
     )
-    plt.colorbar(im, ax=ax, label=f"Rugosity VRM (r={radius_km} km)")
-
-    if contours is not None:
-        _add_contours(data, ax, contours)
-
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
-    return fig, ax
 
 
 def plot_aspect(
@@ -321,6 +370,11 @@ def plot_aspect(
         Contour levels
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     asp_data = aspect(data)
     extent = get_extent(data)
@@ -367,6 +421,13 @@ def plot_geomorphons(
         Flatness angle threshold in degrees.
     **kwargs
         Additional arguments passed to imshow.
+
+    Examples
+    --------
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
 
     Examples
     --------
@@ -423,6 +484,13 @@ def plot_overview(
 
     Examples
     --------
+    Returns
+    -------
+    tuple[Figure, np.ndarray]
+        Matplotlib figure and array of axes for further customisation.
+
+    Examples
+    --------
     >>> plot_overview(data)
     """
     n_panels = 8
@@ -439,7 +507,7 @@ def plot_overview(
     extent = get_extent(data)
     imkw = dict(origin="lower", extent=extent, aspect="auto")
 
-    hs = hillshade(-data, azimuth=315, angle_altitude=45)
+    hs = _hillshade(data)
     sl = slope(data)
     asp = aspect(data)
     cu = curvature(data)
@@ -460,7 +528,7 @@ def plot_overview(
     plt.colorbar(im, ax=axes[0, 0], label="m")
     axes[0, 0].set_title(title(0, "Bathymetry"))
 
-    axes[0, 1].imshow(hs.values, cmap="gray", **imkw)
+    axes[0, 1].imshow(hs, cmap="gray", **imkw)
     axes[0, 1].set_title(title(1, "Hillshade"))
 
     vmax = float(np.nanpercentile(sl.values, 99))
@@ -511,7 +579,14 @@ def plot_overview(
 
 
 def plot_histogram(data: xr.DataArray, bins: int = 50, **kwargs) -> tuple[Figure, Axes]:
-    """Plot histogram of elevation values."""
+    """
+    Plot histogram of elevation values.
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
+    """
     fig, ax = plt.subplots(figsize=(10, 6))
 
     values = _clean_values(data)
@@ -547,6 +622,11 @@ def plot_depth_zones(
         Contour levels
     **kwargs
         Additional arguments passed to imshow
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     if zones is None:
         zones = [0, -200, -1000, -4000]
@@ -622,6 +702,11 @@ def plot_surface3d(
         Azimuth viewing angle in degrees.
     **kwargs
         Additional arguments passed to plot_surface
+
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
     """
     fig = plt.figure(figsize=(14, 8))
     ax = fig.add_subplot(111, projection="3d")
@@ -652,9 +737,9 @@ def plot_surface3d(
     lon_scale = np.cos(np.radians(lat_centre))
     ax.set_box_aspect(
         [
-            np.ptp(lon) * lon_scale,
-            np.ptp(lat),
-            np.ptp(z) * vertical_exaggeration / 1000,
+            (lon.max() - lon.min()) * lon_scale,
+            lat.max() - lat.min(),
+            (z.max() - z.min()) * vertical_exaggeration / 1000,
         ]
     )
 
@@ -680,6 +765,13 @@ def plot_hypsometric_curve(
         Number of elevation bins
     **kwargs
         Additional arguments passed to plt.plot
+
+    Examples
+    --------
+    Returns
+    -------
+    tuple[Figure, Axes]
+        Matplotlib figure and axes for further customisation.
 
     Examples
     --------

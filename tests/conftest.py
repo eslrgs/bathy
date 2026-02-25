@@ -24,7 +24,7 @@ def _make_bathy(elevations, n=20):
 def fake_data():
     """Raw DataArray with random bathymetry data."""
     return xr.DataArray(
-        np.random.rand(20, 20) * -100,
+        np.random.default_rng(42).random((20, 20)) * -100,
         coords={"lon": np.linspace(-10, -5, 20), "lat": np.linspace(50, 55, 20)},
         dims=["lat", "lon"],
         name="elevation",

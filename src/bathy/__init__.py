@@ -47,9 +47,9 @@ from bathy.profile import (
     knickpoints,
     max_depth,
     profile_from_coordinates,
+    profile_stats,
     profiles_from_gdf,
     profiles_from_shapefile,
-    stats,
     to_gdf,
 )
 from bathy.profile_plot import (
@@ -100,7 +100,7 @@ __all__ = [
     "cross_sections",
     "profiles_from_shapefile",
     "profiles_from_gdf",
-    "stats",
+    "profile_stats",
     "max_depth",
     "gradient",
     "concavity_index",

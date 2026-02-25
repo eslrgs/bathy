@@ -11,6 +11,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from scipy.ndimage import gaussian_filter1d
 
+from bathy.plot import get_extent
 from bathy.profile import (
     Profile,
     _ensure_descending,
@@ -18,7 +19,6 @@ from bathy.profile import (
     get_canyons,
     gradient,
 )
-from bathy.utils import get_extent
 
 logger = logging.getLogger(__name__)
 

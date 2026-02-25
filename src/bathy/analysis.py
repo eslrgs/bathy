@@ -360,6 +360,12 @@ def geomorphons(
         1=flat, 2=peak, 3=ridge, 4=shoulder, 5=spur,
         6=slope, 7=hollow, 8=footslope, 9=valley, 10=pit
 
+    Notes
+    -----
+    Cells within ``lookup_km`` of the grid edge receive fewer directional
+    comparisons and may be misclassified. Consider trimming edges for
+    critical analyses.
+
     References
     ----------
     Jasiewicz, J., & Stepinski, T.F. (2013). Geomorphons — a pattern
