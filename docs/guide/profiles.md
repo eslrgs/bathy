@@ -30,6 +30,21 @@ result["profiles"]  # list of drawn Profile objects
 
 The profile plot on the right updates as you draw and edit. See the [interactive notebook](https://github.com/eslrgs/bathy/blob/main/notebooks/interactive.ipynb) for a worked example.
 
+### Saving and reloading
+
+Profiles can be saved to a file and reloaded for further editing, like a GIS project:
+
+```python
+# Save drawn profiles
+bathy.to_gdf(result["profiles"]).to_file("profiles.gpkg")
+
+# Later: reload and continue editing
+profiles = bathy.profiles_from_file(data, "profiles.gpkg")
+result = bathy.draw_profile(data, profiles=profiles)
+```
+
+Waypoint coordinates are preserved through the round-trip. You can also load profiles from any source — shapefiles, GeoDataFrames, or previous `draw_profile` sessions.
+
 ## Creating profiles
 
 ### From coordinates
@@ -59,11 +74,11 @@ prof = bathy.extract_profile(
 
 ### From shapefile or GeoDataFrame
 
-Load profiles from a shapefile or an in-memory GeoDataFrame of LineStrings:
+Load profiles from a vector file or an in-memory GeoDataFrame of LineStrings:
 
 ```python
 # From shapefile
-profiles = bathy.profiles_from_shapefile(
+profiles = bathy.profiles_from_file(
     data,
     "path/to/canyons.shp",
     id_column="NAME",

@@ -453,20 +453,23 @@ def cross_sections(
     return sections
 
 
-def profiles_from_shapefile(
+def profiles_from_file(
     data: xr.DataArray,
-    shapefile_path: str | Path,
+    path: str | Path,
     id_column: str | None = None,
 ) -> list[Profile]:
     """
-    Create profiles from linestring features in a shapefile.
+    Create profiles from linestring features in a vector file.
+
+    Accepts any format supported by GeoPandas (Shapefile, GeoPackage,
+    GeoJSON, etc.).
 
     Parameters
     ----------
     data : xr.DataArray
         Elevation data
-    shapefile_path : str
-        Path to shapefile containing LineString or MultiLineString features
+    path : str or Path
+        Path to vector file containing LineString or MultiLineString features
     id_column : str, optional
         Column name to use for profile naming
 
@@ -476,9 +479,9 @@ def profiles_from_shapefile(
 
     Examples
     --------
-    >>> profiles = profiles_from_shapefile(data, "canyons.shp", id_column="NAME")
+    >>> profiles = profiles_from_file(data, "canyons.gpkg", id_column="NAME")
     """
-    return profiles_from_gdf(data, gpd.read_file(shapefile_path), id_column=id_column)
+    return profiles_from_gdf(data, gpd.read_file(path), id_column=id_column)
 
 
 def profiles_from_gdf(

@@ -383,7 +383,7 @@ def plot_profiles_grid(
     Examples
     --------
     >>> from bathy.profile_plot import plot_profiles_grid
-    >>> profiles = profiles_from_shapefile(data, "canyons.shp")
+    >>> profiles = profiles_from_file(data, "canyons.shp")
     >>> plot_profiles_grid(profiles[:10])
     """
     if isinstance(profiles, Profile):

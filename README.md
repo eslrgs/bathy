@@ -63,7 +63,7 @@ uv pip install .
 `plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_aspect()`, `plot_curvature()`, `plot_bpi()`, `plot_rugosity()`, `plot_geomorphons()`, `plot_overview()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`, `plot_hypsometric_curve()`
 
 **Profile construction:**
-`extract_profile()`, `profile_from_coordinates()`, `cross_sections()`, `profiles_from_shapefile()`, `profiles_from_gdf()`
+`extract_profile()`, `profile_from_coordinates()`, `cross_sections()`, `profiles_from_file()`, `profiles_from_gdf()`
 
 **Profile analysis:**
 `stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`, `compare_stats()`, `to_gdf()`

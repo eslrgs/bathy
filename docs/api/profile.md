@@ -9,7 +9,7 @@
 ::: bathy.extract_profile
 ::: bathy.profile_from_coordinates
 ::: bathy.cross_sections
-::: bathy.profiles_from_shapefile
+::: bathy.profiles_from_file
 ::: bathy.profiles_from_gdf
 
 ## Analysis

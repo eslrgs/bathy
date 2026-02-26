@@ -49,8 +49,8 @@ from bathy.profile import (
     max_depth,
     profile_from_coordinates,
     profile_stats,
+    profiles_from_file,
     profiles_from_gdf,
-    profiles_from_shapefile,
     to_gdf,
 )
 from bathy.profile_plot import (
@@ -99,7 +99,7 @@ __all__ = [
     "extract_profile",
     "profile_from_coordinates",
     "cross_sections",
-    "profiles_from_shapefile",
+    "profiles_from_file",
     "profiles_from_gdf",
     "profile_stats",
     "max_depth",

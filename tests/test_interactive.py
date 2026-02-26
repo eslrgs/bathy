@@ -9,6 +9,7 @@ import pytest  # noqa: E402
 from matplotlib.backend_bases import KeyEvent, MouseButton, MouseEvent  # noqa: E402
 
 from bathy.interactive import draw_profile  # noqa: E402
+from bathy.profile import extract_profile, profile_from_coordinates  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -370,3 +371,46 @@ def test_insert_on_active_profile(fake_data):
 
     assert len(state["profiles"]) == 1
     assert len(state["profiles"][0].distances) == 3
+
+
+# -- loading existing profiles --------------------------------------------
+
+
+def test_load_existing_profiles(fake_data):
+    """Passing profiles pre-populates the map with editable profiles."""
+    p1 = profile_from_coordinates(fake_data, [(-8, 52), (-7, 53)], name="A")
+    p2 = profile_from_coordinates(fake_data, [(-9, 51), (-6, 54)], name="B")
+
+    state = draw_profile(fake_data, profiles=[p1, p2])
+
+    assert len(state["profiles"]) == 2
+    assert state["profiles"][0].name == "Profile 1"
+    assert state["profiles"][1].name == "Profile 2"
+
+
+def test_load_profiles_without_path_metadata(fake_data):
+    """Profiles from extract_profile fall back to start/end coordinates."""
+    prof = extract_profile(fake_data, (-8, 52), (-6, 54), num_points=50)
+    # extract_profile stores only start/end in metadata
+    state = draw_profile(fake_data, profiles=[prof])
+
+    assert len(state["profiles"]) == 1
+    assert len(state["profiles"][0].distances) == 2
+
+
+def test_load_and_draw_more(fake_data):
+    """Loaded profiles and newly drawn profiles coexist."""
+    existing = profile_from_coordinates(
+        fake_data, [(-8, 52), (-7, 53)], name="Existing"
+    )
+    state = draw_profile(fake_data, profiles=[existing])
+    fig = plt.gcf()
+    ax_map = fig.axes[0]
+
+    _click(fig, ax_map, -9, 51)
+    _click(fig, ax_map, -6, 54)
+    _click(fig, ax_map, -6, 54, button=MouseButton.RIGHT)
+
+    assert len(state["profiles"]) == 2
+    assert state["profiles"][0].name == "Profile 1"
+    assert state["profiles"][1].name == "Profile 2"

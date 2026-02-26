@@ -10,7 +10,7 @@ from matplotlib.backend_bases import MouseButton
 from matplotlib.lines import Line2D
 
 from bathy.plot import get_extent
-from bathy.profile import profile_from_coordinates
+from bathy.profile import Profile, profile_from_coordinates
 
 _COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#a65628"]
 
@@ -52,7 +52,12 @@ class _ProfileDrawer:
     Not intended for direct use --- instantiated by ``draw_profile()``.
     """
 
-    def __init__(self, data: xr.DataArray, cmap) -> None:
+    def __init__(
+        self,
+        data: xr.DataArray,
+        cmap,
+        profiles: list[Profile] | None = None,
+    ) -> None:
         self._data = data
         extent = get_extent(data)
 
@@ -77,6 +82,8 @@ class _ProfileDrawer:
         self._profile_states: list[_ProfileState] = []
         self._drag_info: tuple[int, int] | None = None
 
+        if profiles:
+            self._load_profiles(profiles)
         self._start_new_profile()
 
         # Prevent garbage collection: mpl_connect stores bound methods as
@@ -112,6 +119,25 @@ class _ProfileDrawer:
                 coords=[], line_artist=line, marker_artist=markers, color=color
             )
         )
+
+    def _load_profiles(self, profiles: list[Profile]) -> None:
+        """Populate the map with existing profiles for editing."""
+        for prof in profiles:
+            lons = prof.metadata.get("path_lons")
+            lats = prof.metadata.get("path_lats")
+            if lons and lats:
+                coords = list(zip(lons, lats))
+            else:
+                coords = [
+                    (prof.start_lon, prof.start_lat),
+                    (prof.end_lon, prof.end_lat),
+                ]
+            self._start_new_profile()
+            ps = self._profile_states[-1]
+            ps.coords = coords
+            ps.finished = True
+            self._update_map_artists(len(self._profile_states) - 1)
+        self._sync_and_replot()
 
     def _update_map_artists(self, idx: int) -> None:
         ps = self._profile_states[idx]
@@ -331,6 +357,7 @@ class _ProfileDrawer:
 
 def draw_profile(
     data: xr.DataArray,
+    profiles: list[Profile] | None = None,
     cmap=cmo.deep_r,
 ) -> dict:
     """
@@ -344,12 +371,19 @@ def draw_profile(
     Click on a line segment to insert a new waypoint.
     Drag any waypoint to reposition it; the profile updates on release.
 
+    Pass existing profiles via the *profiles* parameter to reload and
+    edit them. This enables a round-trip workflow: draw, save with
+    ``to_gdf(...).to_file()``, then reload with ``profiles_from_file``
+    and pass back in for further editing.
+
     Requires the ipympl backend (``%matplotlib widget``) in Jupyter.
 
     Parameters
     ----------
     data : xr.DataArray
         Elevation data with lon and lat coordinates.
+    profiles : list[Profile], optional
+        Existing profiles to load onto the map for editing.
     cmap
         Colourmap for bathymetry display.
 
@@ -377,6 +411,11 @@ def draw_profile(
         # Double-click to stop drawing
         result["profiles"]       # list of all profiles
         result["profiles"][0]    # first profile
+
+        # Save and reload for further editing
+        bathy.to_gdf(result["profiles"]).to_file("profiles.gpkg")
+        reloaded = bathy.profiles_from_file(data, "profiles.gpkg")
+        result = bathy.draw_profile(data, profiles=reloaded)
     """
-    drawer = _ProfileDrawer(data, cmap)
+    drawer = _ProfileDrawer(data, cmap, profiles=profiles)
     return drawer._state
