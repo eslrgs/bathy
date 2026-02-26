@@ -4,7 +4,7 @@ Bathymetric profiles allow you to analyse depth variations along a transect.
 
 ## Interactive drawing
 
-Draw profiles by clicking directly on the map (requires `%matplotlib widget` in Jupyter):
+Draw and edit profiles by clicking directly on the map (requires `%matplotlib widget` in Jupyter):
 
 ```python
 %matplotlib widget
@@ -12,10 +12,23 @@ import bathy
 
 data = bathy.load_gebco_opendap(lon_range=(-12, -4), lat_range=(50, 56))
 result = bathy.draw_profile(data)
-# Left-click to add waypoints, right-click to finish each profile
-# Double-click to stop drawing
 result["profiles"]  # list of drawn Profile objects
 ```
+
+**Drawing:**
+
+- **Left-click** to add waypoints along a profile path
+- **Right-click** to finish the current profile and start a new one
+- **Double-click** to stop drawing entirely
+
+**Editing:**
+
+- **Drag** any waypoint to reposition it (works on finished profiles too)
+- **Middle-click** or press **z** to undo the last placed waypoint
+- **Shift-click** on a waypoint to delete it
+- **Click on a line segment** to insert a new waypoint between two existing ones
+
+The profile plot on the right updates as you draw and edit. See the [interactive notebook](https://github.com/eslrgs/bathy/blob/main/notebooks/interactive.ipynb) for a worked example.
 
 ## Creating profiles
 

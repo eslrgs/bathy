@@ -71,6 +71,9 @@ uv pip install .
 **Profile plotting:**
 `plot_profile()`, `plot_profiles()`, `plot_profiles_grid()`, `plot_profiles_map()`, `plot_gradient()`, `plot_knickpoints()`, `plot_canyons()`
 
+**Interactive:**
+`draw_profile()` — draw and edit profiles on a map in Jupyter (`%matplotlib widget`). Supports drag-to-reposition, undo, delete, and insert waypoints.
+
 ## Preset regions
 
 28 preset regions available:
@@ -85,7 +88,7 @@ data = bathy.load_gebco_opendap(region="mediterranean")
 
 ## Examples
 
-See [notebooks/basic_usage.ipynb](notebooks/basic_usage.ipynb) and [notebooks/profiles.ipynb](notebooks/profiles.ipynb).
+See [notebooks/basic_usage.ipynb](notebooks/basic_usage.ipynb), [notebooks/profiles.ipynb](notebooks/profiles.ipynb), and [notebooks/interactive.ipynb](notebooks/interactive.ipynb).
 
 ## Development
 
