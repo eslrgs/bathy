@@ -7,6 +7,18 @@ authors = [
     { name = "eslrgs", email = "euan-soutter@hotmail.co.uk" }
 ]
 requires-python = ">=3.12"
+license = { file = "LICENSE" }
+keywords = ["bathymetry", "geomorphology", "oceanography"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering",
+]
+
 dependencies = [
     "xarray>=2024.1.0",
     "netcdf4>=1.6.0",
@@ -21,6 +33,12 @@ dependencies = [
     "polars>=1.0.0",
     "tqdm>=4.66.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/eslrgs/bathy"
+Repository = "https://github.com/eslrgs/bathy"
+Documentation = "https://eslrgs.github.io/bathy/"
+Issues = "https://github.com/eslrgs/bathy/issues"
 
 [project.optional-dependencies]
 notebook = [
@@ -42,6 +60,10 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.9.18,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+source-exclude = ["tests/", "notebooks/", "docs/", "data/", "site/", "**/.DS_Store"]
+wheel-exclude = ["**/.DS_Store"]
 
 [tool.ruff]
 line-length = 88
