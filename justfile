@@ -15,6 +15,6 @@ docs:
 docs-build:
     uv run mkdocs build
 
-# Build package for distribution
+# Build package 
 build:
     uv build
