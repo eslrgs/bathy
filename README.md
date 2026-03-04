@@ -53,26 +53,15 @@ uv pip install .
 
 ## Features
 
-**IO:**
-`load_bathymetry()`, `load_gebco_opendap()`, `to_geotiff()`, `list_regions()`
-
-**Analysis:**
-`summary()`, `slope()`, `aspect()`, `curvature()`, `bpi()`, `rugosity()`, `geomorphons()`, `hypsometric_index()`, `hypsometric_curve()`
-
-**Plotting:**
-`plot_bathy()`, `plot_hillshade()`, `plot_slope()`, `plot_aspect()`, `plot_curvature()`, `plot_bpi()`, `plot_rugosity()`, `plot_geomorphons()`, `plot_overview()`, `plot_depth_zones()`, `plot_histogram()`, `plot_surface3d()`, `plot_hypsometric_curve()`
-
-**Profile construction:**
-`extract_profile()`, `profile_from_coordinates()`, `cross_sections()`, `profiles_from_file()`, `profiles_from_gdf()`
-
-**Profile analysis:**
-`profile_stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`, `compare_stats()`, `to_gdf()`
-
-**Profile plotting:**
-`plot_profile()`, `plot_profiles()`, `plot_profiles_grid()`, `plot_profiles_map()`, `plot_gradient()`, `plot_knickpoints()`, `plot_canyons()`
-
-**Interactive:**
-`draw_profile()` — draw and edit profiles on a map in Jupyter (`%matplotlib widget`). Supports drag-to-reposition, undo, delete, and insert waypoints.
+| Category | Functions |
+|---|---|
+| **IO** | `load_bathymetry`, `load_gebco_opendap`, `to_geotiff`, `list_regions` |
+| **Bathymetric analysis** | `slope`, `aspect`, `curvature`, `rugosity`, `bpi`, `geomorphons`, `hypsometric_index`, `hypsometric_curve`, `summary` |
+| **Grid plotting** | `plot_bathy`, `plot_hillshade`, `plot_slope`, `plot_aspect`, `plot_curvature`, `plot_bpi`, `plot_rugosity`, `plot_geomorphons`, `plot_overview`, `plot_depth_zones`, `plot_histogram`, `plot_surface3d`, `plot_hypsometric_curve` |
+| **Profiles** | `extract_profile`, `profile_from_coordinates`, `cross_sections`, `profiles_from_file`, `profiles_from_gdf` |
+| **Profile analysis** | `profile_stats`, `max_depth`, `gradient`, `concavity_index`, `knickpoints`, `get_canyons`, `compare_stats`, `to_gdf` |
+| **Profile plotting** | `plot_profile`, `plot_profiles`, `plot_profiles_grid`, `plot_profiles_map`, `plot_gradient`, `plot_knickpoints`, `plot_canyons` |
+| **Interactive** | `draw_profile` — draw and edit profiles on a map in Jupyter with drag, undo, delete, and insert waypoints |
 
 ## Preset regions
 
