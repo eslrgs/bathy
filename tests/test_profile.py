@@ -266,6 +266,32 @@ def test_profile_from_coordinates_too_few():
         profile_from_coordinates(data, [(-9, 52)])
 
 
+def test_profile_from_coordinates_out_of_bounds(fake_data):
+    """Coordinates outside DEM bounds raise ValueError."""
+    with pytest.raises(ValueError, match="outside"):
+        profile_from_coordinates(fake_data, [(-9, 52), (0, 52)])
+
+
+def test_profile_from_coordinates_with_point_spacing(fake_data):
+    """point_spacing interpolates between vertices."""
+    coords = [(-9, 52), (-7, 53)]
+    prof_vertex = profile_from_coordinates(fake_data, coords, name="Vertex")
+    prof_interp = profile_from_coordinates(
+        fake_data, coords, point_spacing=0.5, name="Interp"
+    )
+
+    assert len(prof_vertex.distances) == 2
+    assert len(prof_interp.distances) > 2
+    assert prof_interp.distances[0] == 0
+    assert np.all(np.diff(prof_interp.distances) > 0)
+
+
+def test_profile_from_coordinates_point_spacing_invalid(fake_data):
+    """Negative point_spacing raises ValueError."""
+    with pytest.raises(ValueError, match="positive"):
+        profile_from_coordinates(fake_data, [(-9, 52), (-7, 53)], point_spacing=-1.0)
+
+
 # cross_sections
 
 

@@ -301,11 +301,15 @@ def extract_profile(
 def profile_from_coordinates(
     data: xr.DataArray,
     coordinates: list[tuple[float, float]],
+    point_spacing: float | None = None,
     name: str | None = None,
     metadata: dict | None = None,
 ) -> Profile:
     """
     Create a Profile from a list of (lon, lat) coordinates.
+
+    By default, samples only at the given vertices. Use ``point_spacing``
+    to interpolate along each segment at regular intervals.
 
     Parameters
     ----------
@@ -313,6 +317,9 @@ def profile_from_coordinates(
         Elevation data
     coordinates : list[tuple[float, float]]
         List of (lon, lat) coordinate pairs defining the path
+    point_spacing : float, optional
+        Spacing between sample points in km. When provided, each segment
+        is interpolated along the geodesic at this interval.
     name : str, optional
         Name for this profile
     metadata : dict, optional
@@ -326,37 +333,94 @@ def profile_from_coordinates(
     --------
     >>> coords = [(-10.0, 50.0), (-9.5, 50.5), (-9.0, 51.0)]
     >>> prof = profile_from_coordinates(data, coords, name="Custom Path")
+    >>> prof = profile_from_coordinates(data, coords, point_spacing=1.0)
     """
     if len(coordinates) < 2:
         raise ValueError(f"Need at least 2 coordinates, got {len(coordinates)}")
+    if point_spacing is not None and point_spacing <= 0:
+        raise ValueError(f"point_spacing must be positive, got {point_spacing}")
+
+    lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
+    lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
+    for i, (lon, lat) in enumerate(coordinates):
+        if not (lon_min <= lon <= lon_max):
+            raise ValueError(
+                f"coordinates[{i}] longitude ({lon}) is outside "
+                f"DEM bounds [{lon_min:.2f}, {lon_max:.2f}]"
+            )
+        if not (lat_min <= lat <= lat_max):
+            raise ValueError(
+                f"coordinates[{i}] latitude ({lat}) is outside "
+                f"DEM bounds [{lat_min:.2f}, {lat_max:.2f}]"
+            )
 
     start_lon, start_lat = coordinates[0]
     end_lon, end_lat = coordinates[-1]
-
     geod = Geodesic.WGS84
-    dist_list = []
-    elev_list = []
-    cumulative_distance = 0.0
 
-    for i, (lon, lat) in enumerate(coordinates):
-        elev = float(data.sel(lon=lon, lat=lat, method="nearest").values)
-        elev_list.append(elev)
+    if point_spacing is not None:
+        all_elevations = []
+        all_distances = []
+        cumulative_km = 0.0
 
-        if i == 0:
-            dist_list.append(0.0)
-        else:
-            prev_lon, prev_lat = coordinates[i - 1]
-            result = geod.Inverse(prev_lat, prev_lon, lat, lon)
-            cumulative_distance += result["s12"] / 1000
-            dist_list.append(cumulative_distance)
+        for i in range(len(coordinates) - 1):
+            seg_start_lon, seg_start_lat = coordinates[i]
+            seg_end_lon, seg_end_lat = coordinates[i + 1]
+
+            n = _calculate_num_points(
+                seg_start_lon,
+                seg_start_lat,
+                seg_end_lon,
+                seg_end_lat,
+                num_points=None,
+                point_spacing=point_spacing,
+            )
+            elevations, seg_distances = _extract_profile_arrays(
+                data,
+                seg_start_lon,
+                seg_start_lat,
+                seg_end_lon,
+                seg_end_lat,
+                n,
+            )
+
+            if i > 0:
+                elevations = elevations[1:]
+                seg_distances = seg_distances[1:]
+
+            all_elevations.append(elevations)
+            all_distances.append(seg_distances + cumulative_km)
+            cumulative_km = all_distances[-1][-1]
+
+        dist_array = np.concatenate(all_distances)
+        elev_array = np.concatenate(all_elevations)
+    else:
+        dist_list = []
+        elev_list = []
+        cumulative_distance = 0.0
+
+        for i, (lon, lat) in enumerate(coordinates):
+            elev = float(data.sel(lon=lon, lat=lat, method="nearest").values)
+            elev_list.append(elev)
+
+            if i == 0:
+                dist_list.append(0.0)
+            else:
+                prev_lon, prev_lat = coordinates[i - 1]
+                result = geod.Inverse(prev_lat, prev_lon, lat, lon)
+                cumulative_distance += result["s12"] / 1000
+                dist_list.append(cumulative_distance)
+
+        dist_array = np.array(dist_list)
+        elev_array = np.array(elev_list)
 
     meta = dict(metadata) if metadata else {}
     meta["path_lons"] = [c[0] for c in coordinates]
     meta["path_lats"] = [c[1] for c in coordinates]
 
     return Profile(
-        distances=np.array(dist_list),
-        elevations=np.array(elev_list),
+        distances=dist_array,
+        elevations=elev_array,
         start_lon=start_lon,
         start_lat=start_lat,
         end_lon=end_lon,
@@ -457,6 +521,7 @@ def profiles_from_file(
     data: xr.DataArray,
     path: str | Path,
     id_column: str | None = None,
+    point_spacing: float | None = None,
 ) -> list[Profile]:
     """
     Create profiles from linestring features in a vector file.
@@ -472,6 +537,9 @@ def profiles_from_file(
         Path to vector file containing LineString or MultiLineString features
     id_column : str, optional
         Column name to use for profile naming
+    point_spacing : float, optional
+        Spacing between sample points in km. When provided, each segment
+        is interpolated along the geodesic at this interval.
 
     Returns
     -------
@@ -481,13 +549,16 @@ def profiles_from_file(
     --------
     >>> profiles = profiles_from_file(data, "canyons.gpkg", id_column="NAME")
     """
-    return profiles_from_gdf(data, gpd.read_file(path), id_column=id_column)
+    return profiles_from_gdf(
+        data, gpd.read_file(path), id_column=id_column, point_spacing=point_spacing
+    )
 
 
 def profiles_from_gdf(
     data: xr.DataArray,
     gdf: gpd.GeoDataFrame,
     id_column: str | None = None,
+    point_spacing: float | None = None,
 ) -> list[Profile]:
     """
     Create profiles from LineString features in a GeoDataFrame.
@@ -500,6 +571,9 @@ def profiles_from_gdf(
         GeoDataFrame with LineString or MultiLineString geometries
     id_column : str, optional
         Column to use for profile names
+    point_spacing : float, optional
+        Spacing between sample points in km. When provided, each segment
+        is interpolated along the geodesic at this interval.
 
     Returns
     -------
@@ -554,7 +628,11 @@ def profiles_from_gdf(
 
             profiles.append(
                 profile_from_coordinates(
-                    data=data, coordinates=coords, name=name, metadata=meta
+                    data=data,
+                    coordinates=coords,
+                    point_spacing=point_spacing,
+                    name=name,
+                    metadata=meta,
                 )
             )
 
