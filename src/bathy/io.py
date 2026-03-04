@@ -364,6 +364,9 @@ def to_geotiff(
     --------
     >>> to_geotiff(data, 'output.tif')
     """
+    parent = Path(filepath).parent
+    if not parent.exists():
+        raise FileNotFoundError(f"Output directory does not exist: {parent}")
 
     if data.rio.crs is None:
         data = data.rio.write_crs(crs)
