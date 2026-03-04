@@ -1,9 +1,8 @@
-"""Tests for bathymetry module."""
+"""Tests for analysis module."""
 
 import numpy as np
 import xarray as xr
 
-import bathy.io as io_module
 from bathy.analysis import (
     aspect,
     bpi,
@@ -15,29 +14,6 @@ from bathy.analysis import (
     slope,
     summary,
 )
-from bathy.io import (
-    list_regions,
-    load_bathymetry,
-    load_gebco_opendap,
-)
-from bathy.profile import extract_profile
-
-
-def test_list_regions():
-    """List all preset regions."""
-    regions = list_regions()
-
-    assert "mediterranean" in regions
-    assert "mariana_trench" in regions
-
-
-def test_load_from_netcdf(temp_netcdf):
-    """Load bathymetry from NetCDF file."""
-    data = load_bathymetry(temp_netcdf)
-
-    assert data.shape == (20, 20)
-    assert (float(data.lon.min()), float(data.lon.max())) == (-10.0, -5.0)
-    assert (float(data.lat.min()), float(data.lat.max())) == (50.0, 55.0)
 
 
 def test_summary_stats(fake_bathy):
@@ -55,31 +31,6 @@ def test_slope_calculation(fake_bathy):
 
     assert slope_da.shape == fake_bathy.shape
     assert (slope_da.values >= 0).all()
-
-
-def test_create_profile(fake_bathy):
-    """Create a profile from bathymetry data."""
-    prof = extract_profile(fake_bathy, start=(-9, 52), end=(-6, 53), num_points=10)
-
-    assert len(prof.distances) == 10
-    assert len(prof.elevations) == 10
-    assert prof.start_lon == -9
-    assert prof.start_lat == 52
-    assert prof.end_lon == -6
-    assert prof.end_lat == 53
-
-
-def test_plot_bathy_masks_land():
-    """Verify plot_bathy masks land (elevation >= 0)."""
-    data = xr.DataArray(
-        np.array([[-100, 50]]),
-        coords={"lon": [-10, -5], "lat": [50]},
-        dims=["lat", "lon"],
-    )
-
-    masked = data.where(data < 0)
-    assert np.isnan(masked.values[0, 1])
-    assert masked.values[0, 0] == -100
 
 
 # Hypsometry tests
@@ -279,15 +230,6 @@ def test_aspect_west_facing():
     assert np.allclose(asp.values[1:-1, 1:-1], 270, atol=1e-6)
 
 
-def test_to_netcdf(fake_bathy, tmp_path):
-    """Export and reload NetCDF round-trips correctly."""
-    filepath = str(tmp_path / "test_output.nc")
-    fake_bathy.to_netcdf(filepath)
-
-    reloaded = load_bathymetry(filepath)
-    assert reloaded.shape == fake_bathy.shape
-
-
 def test_geomorphons_shape_and_name(fake_bathy):
     """geomorphons returns correct shape and DataArray name."""
     geom = geomorphons(fake_bathy, lookup_km=1.0)
@@ -339,24 +281,3 @@ def test_geomorphons_pit_classified_correctly():
     geom = geomorphons(data, lookup_km=1.0)
 
     assert geom.values[10, 10] == 10
-
-
-def test_from_gebco_opendap_skips_download_if_file_exists(temp_netcdf, monkeypatch):
-    """load_gebco_opendap skips download if save_path exists."""
-    download_called = False
-
-    def mock_download(*args, **kwargs):
-        nonlocal download_called
-        download_called = True
-        return temp_netcdf
-
-    monkeypatch.setattr(io_module, "_download_gebco", mock_download)
-
-    data = load_gebco_opendap(
-        lon_range=(-10, -5),
-        lat_range=(50, 55),
-        save_path=temp_netcdf,
-    )
-
-    assert not download_called
-    assert data.shape == (20, 20)
