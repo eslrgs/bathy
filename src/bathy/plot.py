@@ -422,8 +422,6 @@ def plot_geomorphons(
     **kwargs
         Additional arguments passed to imshow.
 
-    Examples
-    --------
     Returns
     -------
     tuple[Figure, Axes]

@@ -29,7 +29,7 @@ bathy.plot_depth_zones(data)
 
 # Profiles
 prof = bathy.extract_profile(data, (-8, 52), (-2, 58), name="Celtic Sea")
-bathy.stats(prof)
+bathy.profile_stats(prof)
 bathy.plot_profile(prof)
 
 # Canyon analysis
@@ -66,7 +66,7 @@ uv pip install .
 `extract_profile()`, `profile_from_coordinates()`, `cross_sections()`, `profiles_from_file()`, `profiles_from_gdf()`
 
 **Profile analysis:**
-`stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`, `compare_stats()`, `to_gdf()`
+`profile_stats()`, `max_depth()`, `gradient()`, `concavity_index()`, `get_canyons()`, `knickpoints()`, `compare_stats()`, `to_gdf()`
 
 **Profile plotting:**
 `plot_profile()`, `plot_profiles()`, `plot_profiles_grid()`, `plot_profiles_map()`, `plot_gradient()`, `plot_knickpoints()`, `plot_canyons()`

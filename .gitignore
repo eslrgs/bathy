@@ -13,8 +13,9 @@ wheels/
 # Data directories
 data
 
-# Other file
+# Other files
 .DS_Store
+.ipynb_checkpoints/
 
 # Ruff
 .ruff_cache
