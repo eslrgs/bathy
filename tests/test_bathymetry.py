@@ -252,8 +252,8 @@ def test_aspect_flat_surface_is_nan(flat_bathy):
     assert np.all(np.isnan(asp.values))
 
 
-def test_aspect_north_facing():
-    """Surface ascending northward should have aspect = 0°."""
+def test_aspect_south_facing():
+    """Surface ascending northward faces south (downslope = 180°)."""
     lats = np.linspace(50, 55, 20)
     elevations = np.outer(np.linspace(-1000, -500, 20), np.ones(20))
     data = xr.DataArray(
@@ -263,11 +263,11 @@ def test_aspect_north_facing():
     )
     asp = aspect(data)
 
-    assert np.allclose(asp.values[1:-1, 1:-1], 0, atol=1e-6)
+    assert np.allclose(asp.values[1:-1, 1:-1], 180, atol=1e-6)
 
 
-def test_aspect_east_facing():
-    """Surface ascending eastward should have aspect = 90°."""
+def test_aspect_west_facing():
+    """Surface ascending eastward faces west (downslope = 270°)."""
     elevations = np.outer(np.ones(20), np.linspace(-1000, -500, 20))
     data = xr.DataArray(
         elevations,
@@ -276,7 +276,7 @@ def test_aspect_east_facing():
     )
     asp = aspect(data)
 
-    assert np.allclose(asp.values[1:-1, 1:-1], 90, atol=1e-6)
+    assert np.allclose(asp.values[1:-1, 1:-1], 270, atol=1e-6)
 
 
 def test_to_netcdf(fake_bathy, tmp_path):

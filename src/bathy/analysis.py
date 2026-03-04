@@ -306,13 +306,11 @@ def rugosity(data: xr.DataArray, radius_km: float = 1.0) -> xr.DataArray:
 
 def aspect(data: xr.DataArray) -> xr.DataArray:
     """
-    Calculate seafloor aspect.
+    Calculate seafloor aspect (downslope direction).
 
-    Aspect is the compass direction of the steepest upslope gradient,
-    measured in degrees clockwise from north. Flat areas are returned as NaN.
-
-    Note: this returns the *upslope* direction (the direction a slope faces into).
-    The GIS convention is the downslope direction; rotate by 180° to convert.
+    Aspect is the compass direction a slope faces, measured in degrees
+    clockwise from north. This follows the standard GIS convention
+    (ESRI, GDAL, GRASS). Flat areas are returned as NaN.
 
     Parameters
     ----------
@@ -330,7 +328,7 @@ def aspect(data: xr.DataArray) -> xr.DataArray:
     """
     gy, gx, _, _ = _gradients(data)
 
-    asp = (90 - np.degrees(np.arctan2(gy, gx))) % 360
+    asp = (270 - np.degrees(np.arctan2(gy, gx))) % 360
     asp[np.sqrt(gx**2 + gy**2) < 1e-10] = np.nan
 
     return xr.DataArray(asp, coords=data.coords, dims=data.dims, name="aspect")
