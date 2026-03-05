@@ -281,3 +281,28 @@ def test_geomorphons_pit_classified_correctly():
     geom = geomorphons(data, lookup_km=1.0)
 
     assert geom.values[10, 10] == 10
+
+
+def test_geomorphons_ridge_behind_valley():
+    """A cell between a valley and a ridge should not be classified as flat.
+
+    This exercises the line-of-sight scan: the ridge at the lookup
+    distance is hidden behind the nearby valley when only the endpoint
+    is checked, but the full scan detects both features.
+    """
+    elevations = np.full((21, 21), -500.0)
+    # Valley one step east of centre
+    elevations[10, 11] = -900.0
+    # Ridge at the lookup boundary further east
+    elevations[10, 14] = -100.0
+
+    data = xr.DataArray(
+        elevations,
+        coords={"lon": np.linspace(-10, -5, 21), "lat": np.linspace(50, 55, 21)},
+        dims=["lat", "lon"],
+    )
+    geom = geomorphons(data, lookup_km=50.0)
+
+    # Centre cell sees both higher and lower terrain to the east,
+    # so it must not be classified as flat (1) or peak (2) or pit (10).
+    assert geom.values[10, 10] not in (1, 2, 10)
