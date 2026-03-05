@@ -28,7 +28,7 @@ class Profile:
     Attributes
     ----------
     distances : np.ndarray
-        Distances along profile (km)
+        Distances along profile (m)
     elevations : np.ndarray
         Elevation values along profile (m)
     start_lon, start_lat : float
@@ -59,10 +59,9 @@ class Profile:
 
     def __repr__(self) -> str:
         name = f'"{self.name}", ' if self.name else ""
+        dist_km = self.distances[-1] / 1000
         max_depth = np.nanmin(self.elevations)
-        return (
-            f"Profile({name}{self.distances[-1]:.1f} km, max_depth={max_depth:.0f} m)"
-        )
+        return f"Profile({name}{dist_km:.1f} km, max_depth={max_depth:.0f} m)"
 
 
 # ============================================================================
@@ -161,17 +160,17 @@ def _extract_profile_arrays(
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
-        (elevations, distances_km) arrays
+        (elevations, distances_m) arrays
     """
     geod = Geodesic.WGS84
     line = geod.InverseLine(start_lat, start_lon, end_lat, end_lon)
     total_m = line.s13
-    distances_km = np.linspace(0, total_m / 1000, n)
+    distances_m = np.linspace(0, total_m, n)
 
     lons = np.zeros(n)
     lats = np.zeros(n)
-    for i, d_km in enumerate(distances_km):
-        pos = line.Position(d_km * 1000)
+    for i, d_m in enumerate(distances_m):
+        pos = line.Position(d_m)
         lons[i] = pos["lon2"]
         lats[i] = pos["lat2"]
 
@@ -179,7 +178,7 @@ def _extract_profile_arrays(
     lat_da = xr.DataArray(lats, dims="points")
     elevations = data.sel(lon=lon_da, lat=lat_da, method="nearest").values.astype(float)
 
-    return elevations, distances_km
+    return elevations, distances_m
 
 
 def _find_crossing_m(
@@ -361,7 +360,7 @@ def profile_from_coordinates(
     if point_spacing is not None:
         all_elevations = []
         all_distances = []
-        cumulative_km = 0.0
+        cumulative_m = 0.0
 
         for i in range(len(coordinates) - 1):
             seg_start_lon, seg_start_lat = coordinates[i]
@@ -389,15 +388,15 @@ def profile_from_coordinates(
                 seg_distances = seg_distances[1:]
 
             all_elevations.append(elevations)
-            all_distances.append(seg_distances + cumulative_km)
-            cumulative_km = all_distances[-1][-1]
+            all_distances.append(seg_distances + cumulative_m)
+            cumulative_m = all_distances[-1][-1]
 
         dist_array = np.concatenate(all_distances)
         elev_array = np.concatenate(all_elevations)
     else:
         dist_list = []
         elev_list = []
-        cumulative_distance = 0.0
+        cumulative_m = 0.0
 
         for i, (lon, lat) in enumerate(coordinates):
             elev = float(data.sel(lon=lon, lat=lat, method="nearest").values)
@@ -408,8 +407,8 @@ def profile_from_coordinates(
             else:
                 prev_lon, prev_lat = coordinates[i - 1]
                 result = geod.Inverse(prev_lat, prev_lon, lat, lon)
-                cumulative_distance += result["s12"] / 1000
-                dist_list.append(cumulative_distance)
+                cumulative_m += result["s12"]
+                dist_list.append(cumulative_m)
 
         dist_array = np.array(dist_list)
         elev_array = np.array(elev_list)
@@ -470,22 +469,35 @@ def cross_sections(
     if section_width_km <= 0:
         raise ValueError(f"section_width_km must be positive, got {section_width_km}")
 
-    total_distance = profile.distances[-1]
-    section_distances = np.arange(0, total_distance + interval_km, interval_km)
-    if section_distances[-1] > total_distance:
-        section_distances = section_distances[:-1]
+    total_distance_m = profile.distances[-1]
+    interval_m = interval_km * 1000
+    section_distances_m = np.arange(0, total_distance_m + interval_m, interval_m)
+    if section_distances_m[-1] > total_distance_m:
+        section_distances_m = section_distances_m[:-1]
 
     geod = Geodesic.WGS84
 
-    line = geod.InverseLine(
-        profile.start_lat, profile.start_lon, profile.end_lat, profile.end_lon
-    )
+    path_lons = profile.metadata.get("path_lons", [profile.start_lon, profile.end_lon])
+    path_lats = profile.metadata.get("path_lats", [profile.start_lat, profile.end_lat])
+
+    # Build geodesic segments along the actual path
+    seg_lines = []
+    seg_cum_m = [0.0]
+    for j in range(len(path_lons) - 1):
+        seg = geod.InverseLine(
+            path_lats[j], path_lons[j], path_lats[j + 1], path_lons[j + 1]
+        )
+        seg_lines.append(seg)
+        seg_cum_m.append(seg_cum_m[-1] + seg.s13)
 
     sections = []
-    for i, dist_km in enumerate(section_distances):
-        dist_m = dist_km * 1000
-
-        pos = line.Position(dist_m)
+    for i, dist_m in enumerate(section_distances_m):
+        seg_idx = min(
+            np.searchsorted(seg_cum_m, dist_m, side="right") - 1,
+            len(seg_lines) - 1,
+        )
+        local_m = dist_m - seg_cum_m[seg_idx]
+        pos = seg_lines[seg_idx].Position(local_m)
         center_lon = pos["lon2"]
         center_lat = pos["lat2"]
         local_bearing = pos["azi2"]
@@ -502,7 +514,7 @@ def cross_sections(
         end_lon = end_result["lon2"]
         end_lat = end_result["lat2"]
 
-        section_name = f"Section_{i + 1}_at_{dist_km:.1f}km"
+        section_name = f"Section_{i + 1}_at_{dist_m:.0f}m"
         sections.append(
             extract_profile(
                 data,
@@ -583,6 +595,9 @@ def profiles_from_gdf(
     --------
     >>> profiles = profiles_from_gdf(data, gdf, id_column="name")
     """
+    if gdf.crs is not None and not gdf.crs.is_geographic:
+        gdf = gdf.to_crs("EPSG:4326")
+
     profiles = []
     skipped = 0
     lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
@@ -666,13 +681,13 @@ def profile_stats(profile: Profile) -> pl.DataFrame:
     return pl.DataFrame(
         {
             "statistic": [
-                "total_distance",
-                "min_elevation",
-                "max_elevation",
-                "mean_elevation",
-                "median_elevation",
-                "std_elevation",
-                "elevation_range",
+                "total_distance_m",
+                "min_elevation_m",
+                "max_elevation_m",
+                "mean_elevation_m",
+                "median_elevation_m",
+                "std_elevation_m",
+                "elevation_range_m",
             ],
             "value": [
                 float(profile.distances[-1]),
@@ -698,15 +713,15 @@ def max_depth(profile: Profile) -> tuple[float, float]:
     Returns
     -------
     tuple[float, float]
-        (distance, depth) of the deepest point
+        (distance_m, depth_m) of the deepest point
     """
     idx = np.argmin(profile.elevations)
-    return profile.distances[idx], profile.elevations[idx]
+    return float(profile.distances[idx]), float(profile.elevations[idx])
 
 
 def gradient(profile: Profile) -> np.ndarray:
     """
-    Calculate the gradient along the profile.
+    Calculate the slope along the profile in degrees.
 
     Parameters
     ----------
@@ -715,9 +730,10 @@ def gradient(profile: Profile) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Gradient values (m/km)
+        Slope in degrees
     """
-    return np.gradient(profile.elevations, profile.distances)
+    grad = np.gradient(profile.elevations, profile.distances)
+    return np.degrees(np.arctan(grad))
 
 
 def concavity_index(profile: Profile) -> float:
@@ -737,12 +753,11 @@ def concavity_index(profile: Profile) -> float:
     --------
     >>> nci = concavity_index(prof)
     """
-    reference_line = np.linspace(
-        profile.elevations[0], profile.elevations[-1], len(profile.elevations)
-    )
-    deviations = profile.elevations - reference_line
+    _, elevations = _ensure_descending(profile.distances, profile.elevations)
+    reference_line = np.linspace(elevations[0], elevations[-1], len(elevations))
+    deviations = elevations - reference_line
     median_deviation = np.median(deviations)
-    relief = abs(profile.elevations[-1] - profile.elevations[0])
+    relief = abs(elevations[-1] - elevations[0])
 
     if relief == 0:
         return 0.0
@@ -762,19 +777,19 @@ def knickpoints(
     ----------
     profile : Profile
     threshold : float, optional
-        Minimum rate of slope change (degrees/km). Defaults to 2 std above mean.
+        Minimum rate of slope change (degrees/m). Defaults to 2 std above mean.
     smooth : float, optional
         Gaussian smoothing sigma before detection.
 
     Returns
     -------
     pl.DataFrame
-        Knickpoints with columns: distance_km, depth_m, slope_break
+        Knickpoints with columns: distance_m, depth_m, slope_break_deg
     """
     elevations = (
         gaussian_filter1d(profile.elevations, smooth) if smooth else profile.elevations
     )
-    grad = np.gradient(elevations, profile.distances * 1000)
+    grad = np.gradient(elevations, profile.distances)
     slope_deg = np.degrees(np.arctan(np.abs(grad)))
     slope_break = np.abs(np.gradient(slope_deg, profile.distances))
 
@@ -785,9 +800,9 @@ def knickpoints(
 
     return pl.DataFrame(
         {
-            "distance_km": profile.distances[peaks],
+            "distance_m": profile.distances[peaks],
             "depth_m": profile.elevations[peaks],
-            "slope_break": properties["peak_heights"],
+            "slope_break_deg": properties["peak_heights"],
         }
     )
 
@@ -823,7 +838,7 @@ def get_canyons(
         if smooth
         else profile.elevations.copy()
     )
-    distances_m = profile.distances * 1000
+    distances_m = profile.distances
 
     if prominence is None:
         prominence = (
@@ -942,9 +957,9 @@ def compare_stats(profiles: list[Profile]) -> pl.DataFrame:
 
     all_stats = [profile_stats(prof) for prof in profiles]
     result: dict[str, list] = {"statistic": all_stats[0]["statistic"].to_list()}
-    for i, (prof, prof_stats) in enumerate(zip(profiles, all_stats), start=1):
+    for i, (prof, stats) in enumerate(zip(profiles, all_stats), start=1):
         name = prof.name or f"Profile_{i}"
-        result[name] = prof_stats["value"].to_list()
+        result[name] = stats["value"].to_list()
 
     return pl.DataFrame(result)
 
@@ -987,7 +1002,7 @@ def to_gdf(profiles: Profile | list[Profile]) -> gpd.GeoDataFrame:
         row.update(
             {
                 "name": p.name,
-                "total_distance_km": float(p.distances[-1]),
+                "total_distance_m": float(p.distances[-1]),
                 "min_elevation_m": float(np.nanmin(p.elevations)),
                 "max_elevation_m": float(np.nanmax(p.elevations)),
                 "mean_elevation_m": float(np.nanmean(p.elevations)),

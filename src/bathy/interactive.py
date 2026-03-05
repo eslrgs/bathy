@@ -164,7 +164,7 @@ class _ProfileDrawer:
         self._ax_profile.clear()
         for prof, ps in zip(self._state["profiles"], finished):
             self._ax_profile.plot(
-                prof.distances, prof.elevations, color=ps.color, label=prof.name
+                prof.distances / 1000, prof.elevations, color=ps.color, label=prof.name
             )
         _style_profile_axis(self._ax_profile, len(self._state["profiles"]))
 

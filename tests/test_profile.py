@@ -108,7 +108,7 @@ def test_knickpoints_returns_dataframe(fake_data):
     kp = knickpoints(prof)
 
     assert hasattr(kp, "columns")
-    assert set(kp.columns) == {"distance_km", "depth_m", "slope_break"}
+    assert set(kp.columns) == {"distance_m", "depth_m", "slope_break_deg"}
 
 
 def test_knickpoints_with_threshold(fake_data):
@@ -126,7 +126,7 @@ def test_knickpoints_with_smoothing(fake_data):
     prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=50)
     kp = knickpoints(prof, smooth=3)
 
-    assert set(kp.columns) == {"distance_km", "depth_m", "slope_break"}
+    assert set(kp.columns) == {"distance_m", "depth_m", "slope_break_deg"}
 
 
 # GeoDataFrame methods
@@ -142,7 +142,7 @@ def test_to_gdf(fake_profile):
     assert coords[0] == pytest.approx((-9.0, 52.0))
     assert coords[-1] == pytest.approx((-6.0, 53.0))
     assert gdf["name"].iloc[0] == "Test Profile"
-    assert gdf["total_distance_km"].iloc[0] > 0
+    assert gdf["total_distance_m"].iloc[0] > 0
     assert gdf["min_elevation_m"].iloc[0] <= gdf["max_elevation_m"].iloc[0]
     assert gdf["mean_elevation_m"].iloc[0] < 0
 
@@ -300,10 +300,10 @@ def test_profile_from_coordinates_point_spacing_invalid(fake_data):
 def test_cross_sections(fake_data):
     """Cross-sections are generated at expected intervals."""
     prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=20)
-    total_dist = prof.distances[-1]
+    total_dist_km = prof.distances[-1] / 1000
 
     sections = cross_sections(
-        fake_data, prof, interval_km=total_dist / 2, section_width_km=50
+        fake_data, prof, interval_km=total_dist_km / 2, section_width_km=50
     )
 
     assert len(sections) >= 2
@@ -360,8 +360,8 @@ def test_profile_stats(fake_profile):
     assert "statistic" in result.columns
     assert "value" in result.columns
     stats_names = result["statistic"].to_list()
-    assert "total_distance" in stats_names
-    assert "min_elevation" in stats_names
+    assert "total_distance_m" in stats_names
+    assert "min_elevation_m" in stats_names
 
 
 # Canyon detection

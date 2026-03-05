@@ -62,7 +62,7 @@ def plot_profile(
         if smooth
         else profile.elevations
     )
-    distances = profile.distances.copy()
+    distances = profile.distances / 1000
 
     if ensure_descending:
         distances, elevations = _ensure_descending(distances, elevations)
@@ -150,7 +150,7 @@ def plot_knickpoints(
         return fig, axes
 
     axes[-1].scatter(
-        knickpoints_df["distance_km"],
+        knickpoints_df["distance_m"] / 1000,
         knickpoints_df["depth_m"],
         c="red",
         s=50,
@@ -178,10 +178,10 @@ def plot_gradient(profile: Profile, **kwargs) -> tuple[Figure, list[Axes]]:
     grad = gradient(profile)
 
     fig, ax = plt.subplots(figsize=(12, 5))
-    ax.plot(profile.distances, grad, **kwargs)
+    ax.plot(profile.distances / 1000, grad, **kwargs)
     ax.axhline(0, color="gray", linestyle="--", alpha=0.5, linewidth=1)
     ax.set_xlabel("Distance (km)")
-    ax.set_ylabel("Gradient (m km⁻¹)")
+    ax.set_ylabel("Slope (°)")
     ax.grid(True, alpha=0.3)
 
     return fig, [ax]
@@ -323,7 +323,7 @@ def plot_profiles(
         fig, ax_profile = plt.subplots(figsize=(12, 6))
 
     for i, prof in enumerate(profiles, start=1):
-        distances = prof.distances.copy()
+        distances = prof.distances / 1000
         elevations = prof.elevations.copy()
 
         if ensure_descending:
@@ -409,7 +409,7 @@ def plot_profiles_grid(
             if smooth
             else prof.elevations.copy()
         )
-        distances = prof.distances.copy()
+        distances = prof.distances / 1000
 
         if ensure_descending:
             distances, elevations = _ensure_descending(distances, elevations)
@@ -439,7 +439,7 @@ def plot_profiles_grid(
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
         title = prof.name if prof.name else f"Profile {i + 1}"
-        ax.set_title(f"{title} ({prof.distances[-1]:.1f} km)")
+        ax.set_title(f"{title} ({prof.distances[-1] / 1000:.1f} km)")
         ax.grid(True, alpha=0.3)
 
     for i in range(n_profiles, len(axes)):
