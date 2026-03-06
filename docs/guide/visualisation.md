@@ -28,7 +28,7 @@ bathy.plot_bathy(data, contours=10)
 bathy.plot_bathy(data, cmap="viridis")
 ```
 
-## Terrain analysis
+## Bathymetric analysis
 
 ### Hillshade
 
@@ -89,12 +89,12 @@ bathy.plot_geomorphons(data, lookup_km=2.0)
 bathy.plot_geomorphons(data, lookup_km=1.0, flatness_threshold=0.5)
 ```
 
-Geomorphons classify terrain into 10 morphological forms (flat, peak, ridge, shoulder, spur, slope, hollow, footslope, valley, pit) by comparing each cell to eight neighbours at the lookup distance. Colours follow a warm (elevated) → grey (neutral) → cool (depressed) scheme. The `lookup_km` parameter controls the scale of analysis; larger values capture broader landscape forms.
+Geomorphons classify topography into 10 morphological forms (flat, peak, ridge, shoulder, spur, slope, hollow, footslope, valley, pit) by comparing each cell to eight neighbours at the lookup distance. Colours follow a warm (elevated) → grey (neutral) → cool (depressed) scheme. The `lookup_km` parameter controls the scale of analysis; larger values capture broader landscape forms.
 
 ### Overview (all maps)
 
 ```python
-# All eight terrain analyses in one figure
+# All eight bathymetric analyses in one figure
 bathy.plot_overview(data)
 
 # Custom neighbourhood scales

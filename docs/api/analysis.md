@@ -9,7 +9,7 @@
 ::: bathy.hypsometric_index
 ::: bathy.hypsometric_curve
 
-## Terrain
+## Bathymetry
 
 ::: bathy.slope
 ::: bathy.curvature

@@ -1,4 +1,4 @@
-"""Bathymetry terrain analysis functions."""
+"""Bathymetry analysis functions."""
 
 import numpy as np
 import polars as pl
