@@ -44,7 +44,7 @@ class Profile:
     --------
     >>> prof = extract_profile(data, start=(-9.5, 52.0), end=(-5.5, 52.0))
     >>> prof = extract_profile(
-    ...     data, start=(-9.5, 52.0), end=(-5.5, 52.0), point_spacing=1.0
+    ...     data, start=(-9.5, 52.0), end=(-5.5, 52.0), point_spacing=1000.0
     ... )
     """
 
@@ -139,8 +139,8 @@ def _calculate_num_points(
 
     geod = Geodesic.WGS84
     result = geod.Inverse(start_lat, start_lon, end_lat, end_lon)
-    total_distance_km = result["s12"] / 1000
-    return max(2, int(np.ceil(total_distance_km / point_spacing)) + 1)
+    total_distance_m = result["s12"]
+    return max(2, int(np.ceil(total_distance_m / point_spacing)) + 1)
 
 
 def _extract_profile_arrays(
@@ -251,7 +251,7 @@ def extract_profile(
         Number of points along profile. Cannot be used with point_spacing.
         Default: 100 if neither num_points nor point_spacing is specified.
     point_spacing : float, optional
-        Spacing between points in km. Cannot be used with num_points.
+        Spacing between points in metres. Cannot be used with num_points.
     name : str, optional
         Name for this profile
     metadata : dict, optional
@@ -265,7 +265,7 @@ def extract_profile(
     --------
     >>> prof = extract_profile(data, start=(-9.5, 52.0), end=(-5.5, 52.0))
     >>> prof = extract_profile(
-    ...     data, start=(-9.5, 52.0), end=(-5.5, 52.0), point_spacing=1.0
+    ...     data, start=(-9.5, 52.0), end=(-5.5, 52.0), point_spacing=1000.0
     ... )
     """
     start_lon, start_lat = start
@@ -317,7 +317,7 @@ def profile_from_coordinates(
     coordinates : list[tuple[float, float]]
         List of (lon, lat) coordinate pairs defining the path
     point_spacing : float, optional
-        Spacing between sample points in km. When provided, each segment
+        Spacing between sample points in metres. When provided, each segment
         is interpolated along the geodesic at this interval.
     name : str, optional
         Name for this profile
@@ -332,7 +332,7 @@ def profile_from_coordinates(
     --------
     >>> coords = [(-10.0, 50.0), (-9.5, 50.5), (-9.0, 51.0)]
     >>> prof = profile_from_coordinates(data, coords, name="Custom Path")
-    >>> prof = profile_from_coordinates(data, coords, point_spacing=1.0)
+    >>> prof = profile_from_coordinates(data, coords, point_spacing=1000.0)
     """
     if len(coordinates) < 2:
         raise ValueError(f"Need at least 2 coordinates, got {len(coordinates)}")
@@ -432,8 +432,8 @@ def profile_from_coordinates(
 def cross_sections(
     data: xr.DataArray,
     profile: Profile,
-    interval_km: float,
-    section_width_km: float,
+    interval_m: float,
+    section_width_m: float,
     num_points: int | None = None,
     point_spacing: float | None = None,
 ) -> list[Profile]:
@@ -446,14 +446,14 @@ def cross_sections(
         Elevation data
     profile : Profile
         The profile along which to create cross-sections
-    interval_km : float
-        Spacing between cross-sections in kilometers (must be positive)
-    section_width_km : float
-        Total width of each cross-section in kilometers (must be positive)
+    interval_m : float
+        Spacing between cross-sections in metres (must be positive)
+    section_width_m : float
+        Total width of each cross-section in metres (must be positive)
     num_points : int, optional
         Number of points along each cross-section
     point_spacing : float, optional
-        Spacing between points in km along cross-sections
+        Spacing between points in metres along cross-sections
 
     Returns
     -------
@@ -462,15 +462,14 @@ def cross_sections(
     Examples
     --------
     >>> prof = extract_profile(data, start=(-9.5, 52.0), end=(-5.5, 54.0))
-    >>> sections = cross_sections(data, prof, interval_km=10, section_width_km=20)
+    >>> sections = cross_sections(data, prof, interval_m=10000, section_width_m=20000)
     """
-    if interval_km <= 0:
-        raise ValueError(f"interval_km must be positive, got {interval_km}")
-    if section_width_km <= 0:
-        raise ValueError(f"section_width_km must be positive, got {section_width_km}")
+    if interval_m <= 0:
+        raise ValueError(f"interval_m must be positive, got {interval_m}")
+    if section_width_m <= 0:
+        raise ValueError(f"section_width_m must be positive, got {section_width_m}")
 
     total_distance_m = profile.distances[-1]
-    interval_m = interval_km * 1000
     section_distances_m = np.arange(0, total_distance_m + interval_m, interval_m)
     if section_distances_m[-1] > total_distance_m:
         section_distances_m = section_distances_m[:-1]
@@ -490,6 +489,7 @@ def cross_sections(
         seg_lines.append(seg)
         seg_cum_m.append(seg_cum_m[-1] + seg.s13)
 
+    half_width_m = section_width_m / 2
     sections = []
     for i, dist_m in enumerate(section_distances_m):
         seg_idx = min(
@@ -503,7 +503,6 @@ def cross_sections(
         local_bearing = pos["azi2"]
 
         perp_bearing = (local_bearing + 90) % 360
-        half_width_m = (section_width_km / 2) * 1000
 
         start_result = geod.Direct(center_lat, center_lon, perp_bearing, half_width_m)
         start_lon = start_result["lon2"]
@@ -550,7 +549,7 @@ def profiles_from_file(
     id_column : str, optional
         Column name to use for profile naming
     point_spacing : float, optional
-        Spacing between sample points in km. When provided, each segment
+        Spacing between sample points in metres. When provided, each segment
         is interpolated along the geodesic at this interval.
 
     Returns
@@ -584,7 +583,7 @@ def profiles_from_gdf(
     id_column : str, optional
         Column to use for profile names
     point_spacing : float, optional
-        Spacing between sample points in km. When provided, each segment
+        Spacing between sample points in metres. When provided, each segment
         is interpolated along the geodesic at this interval.
 
     Returns

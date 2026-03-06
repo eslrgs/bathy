@@ -63,12 +63,12 @@ prof = bathy.extract_profile(
     name="Western Mediterranean",
 )
 
-# Or with specific point spacing (in km)
+# Or with specific point spacing (in metres)
 prof = bathy.extract_profile(
     data,
     start=(-5, 36),
     end=(10, 40),
-    point_spacing=5.0,  # 5 km spacing
+    point_spacing=5000.0,  # 5 km spacing
 )
 ```
 
@@ -178,14 +178,14 @@ Create perpendicular cross-sections along a main profile:
 
 ```python
 # Main profile
-main = bathy.extract_profile(data, (-11, 47.5), (-6.5, 49), point_spacing=1.0)
+main = bathy.extract_profile(data, (-11, 47.5), (-6.5, 49), point_spacing=1000.0)
 
 # Create cross-sections every 20 km, 30 km wide
 x_sections = bathy.cross_sections(
     data,
     main,
-    interval_km=20,
-    section_width_km=30,
+    interval_m=20000,
+    section_width_m=30000,
     num_points=50,
 )
 

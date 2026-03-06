@@ -279,7 +279,7 @@ def test_profile_from_coordinates_with_point_spacing(fake_data):
     coords = [(-9, 52), (-7, 53)]
     prof_vertex = profile_from_coordinates(fake_data, coords, name="Vertex")
     prof_interp = profile_from_coordinates(
-        fake_data, coords, point_spacing=0.5, name="Interp"
+        fake_data, coords, point_spacing=500.0, name="Interp"
     )
 
     assert len(prof_vertex.distances) == 2
@@ -300,10 +300,9 @@ def test_profile_from_coordinates_point_spacing_invalid(fake_data):
 def test_cross_sections(fake_data):
     """Cross-sections are generated at expected intervals."""
     prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=20)
-    total_dist_km = prof.distances[-1] / 1000
 
     sections = cross_sections(
-        fake_data, prof, interval_km=total_dist_km / 2, section_width_km=50
+        fake_data, prof, interval_m=prof.distances[-1] / 2, section_width_m=50000
     )
 
     assert len(sections) >= 2
@@ -315,7 +314,7 @@ def test_cross_sections(fake_data):
 def test_cross_sections_invalid_interval(fake_data, fake_profile):
     """Negative interval raises ValueError."""
     with pytest.raises(ValueError):
-        cross_sections(fake_data, fake_profile, interval_km=-1, section_width_km=10)
+        cross_sections(fake_data, fake_profile, interval_m=-1, section_width_m=10000)
 
 
 # concavity_index

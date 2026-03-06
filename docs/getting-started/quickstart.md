@@ -83,7 +83,7 @@ prof = bathy.extract_profile(
     data,
     start=(-11, 48),
     end=(-6, 48),
-    point_spacing=1.0,
+    point_spacing=1000.0,
     name="East-West Profile",
 )
 
