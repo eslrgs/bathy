@@ -30,10 +30,10 @@ def test_create_profile(fake_data):
     assert prof.name == "Test"
     assert len(prof.distances) == 10
     assert len(prof.elevations) == 10
-    assert prof.start_lon == -9
-    assert prof.start_lat == 52
-    assert prof.end_lon == -6
-    assert prof.end_lat == 53
+    assert prof.start_x == -9
+    assert prof.start_y == 52
+    assert prof.end_x == -6
+    assert prof.end_y == 53
 
 
 def test_max_depth(fake_data):
@@ -251,8 +251,8 @@ def test_profile_from_coordinates(fake_data):
     assert len(prof.elevations) == 3
     assert prof.distances[0] == 0
     assert np.all(np.diff(prof.distances) > 0)
-    assert prof.start_lon == -9
-    assert prof.end_lon == -7
+    assert prof.start_x == -9
+    assert prof.end_x == -7
 
 
 def test_profile_from_coordinates_too_few():
@@ -325,10 +325,10 @@ def test_concavity_index_straight():
     prof = Profile(
         distances=np.linspace(0, 100, 50),
         elevations=np.linspace(0, -1000, 50),
-        start_lon=0,
-        start_lat=0,
-        end_lon=1,
-        end_lat=1,
+        start_x=0,
+        start_y=0,
+        end_x=1,
+        end_y=1,
     )
     ci = concavity_index(prof)
     assert abs(ci) < 0.01
@@ -341,10 +341,10 @@ def test_concavity_index_concave():
     prof = Profile(
         distances=x,
         elevations=elevations,
-        start_lon=0,
-        start_lat=0,
-        end_lon=1,
-        end_lat=1,
+        start_x=0,
+        start_y=0,
+        end_x=1,
+        end_y=1,
     )
     ci = concavity_index(prof)
     assert ci > 0
@@ -434,3 +434,42 @@ def test_canyon_measurements_in_metres(fake_data):
         assert all(canyons["floor_distance"] >= 0)
         assert all(canyons["width"] >= 0)
         assert all(canyons["depth"] >= 0)
+
+
+# Projected CRS tests
+
+
+def test_extract_profile_projected(fake_projected_data):
+    """Extract a profile from projected data uses Euclidean distances."""
+    prof = extract_profile(
+        fake_projected_data,
+        start=(502000, 5502000),
+        end=(508000, 5508000),
+        num_points=10,
+    )
+    assert len(prof.distances) == 10
+    assert prof.distances[0] == 0
+    assert prof.crs is not None
+    assert prof.crs.to_epsg() == 32629
+    # Euclidean distance should be sqrt(6000^2 + 6000^2) ~ 8485 m
+    import math
+
+    expected = math.hypot(6000, 6000)
+    assert abs(prof.distances[-1] - expected) < 10
+
+
+def test_cross_sections_projected(fake_projected_data):
+    """Cross-sections work on projected data."""
+    prof = extract_profile(
+        fake_projected_data,
+        start=(502000, 5502000),
+        end=(508000, 5508000),
+        num_points=20,
+    )
+    sections = cross_sections(
+        fake_projected_data, prof, interval_m=3000, section_width_m=2000
+    )
+    assert len(sections) >= 1
+    for s in sections:
+        assert s.crs is not None
+        assert s.distances[0] == 0

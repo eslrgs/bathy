@@ -20,6 +20,7 @@ from bathy.analysis import (
     rugosity,
     slope,
 )
+from bathy.utils import axis_labels, get_dim_names, is_projected
 
 
 def get_extent(data: xr.DataArray) -> list[float]:
@@ -29,18 +30,19 @@ def get_extent(data: xr.DataArray) -> list[float]:
     Parameters
     ----------
     data : xr.DataArray
-        Data array with lon and lat coordinates
+        Data array with spatial coordinates
 
     Returns
     -------
     list[float]
-        Extent as [lon_min, lon_max, lat_min, lat_max]
+        Extent as [x_min, x_max, y_min, y_max]
     """
+    x_dim, y_dim = get_dim_names(data)
     return [
-        float(data.lon.min()),
-        float(data.lon.max()),
-        float(data.lat.min()),
-        float(data.lat.max()),
+        float(data[x_dim].min()),
+        float(data[x_dim].max()),
+        float(data[y_dim].min()),
+        float(data[y_dim].max()),
     ]
 
 
@@ -99,8 +101,9 @@ def _plot_grid(
     plt.colorbar(im, ax=ax, label=label)
     if contours is not None:
         _add_contours(data, ax, contours)
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     return fig, ax
 
 
@@ -147,8 +150,9 @@ def plot_bathy(
     if contours is not None:
         _add_contours(data, ax, contours)
 
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     return fig, ax
 
 
@@ -191,8 +195,9 @@ def plot_hillshade(
     if contours is not None:
         _add_contours(data, ax, contours)
 
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     return fig, ax
 
 
@@ -397,8 +402,9 @@ def plot_aspect(
     if contours is not None:
         _add_contours(data, ax, contours)
 
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     return fig, ax
 
 
@@ -452,8 +458,9 @@ def plot_geomorphons(
     cbar.set_ticks(range(1, 11))
     cbar.set_ticklabels(_GEOMORPHON_LABELS)
 
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     return fig, ax
 
 
@@ -566,10 +573,11 @@ def plot_overview(
     cbar.set_ticklabels(_GEOMORPHON_LABELS, fontsize=7)
     axes[3, 1].set_title(title(7, f"Geomorphons ({geomorphons_lookup_km} km)"))
 
+    x_label, y_label = axis_labels(data)
     for ax in axes[3, :]:
-        ax.set_xlabel("Longitude (°)")
+        ax.set_xlabel(x_label)
     for ax in axes[:, 0]:
-        ax.set_ylabel("Latitude (°)")
+        ax.set_ylabel(y_label)
     for ax in axes.ravel():
         ax.label_outer()
 
@@ -667,8 +675,9 @@ def plot_depth_zones(
     cbar.set_ticks(tick_positions)
     cbar.set_ticklabels(tick_labels)
 
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     return fig, ax
 
 
@@ -706,11 +715,13 @@ def plot_surface3d(
     tuple[Figure, Axes]
         Matplotlib figure and axes for further customisation.
     """
+    x_dim, y_dim = get_dim_names(data)
+
     fig = plt.figure(figsize=(14, 8))
     ax = fig.add_subplot(111, projection="3d")
 
-    lon = data.lon.values[::stride]
-    lat = data.lat.values[::stride]
+    x_vals = data[x_dim].values[::stride]
+    y_vals = data[y_dim].values[::stride]
     z = data.values[::stride, ::stride]
 
     if smooth is not None:
@@ -718,11 +729,11 @@ def plot_surface3d(
 
         z = uniform_filter(z, size=smooth, mode="nearest")
 
-    lon_grid, lat_grid = np.meshgrid(lon, lat)
+    x_grid, y_grid = np.meshgrid(x_vals, y_vals)
 
     surf = ax.plot_surface(
-        lon_grid,
-        lat_grid,
+        x_grid,
+        y_grid,
         z,
         cmap=cmo.deep_r,
         linewidth=0,
@@ -731,19 +742,25 @@ def plot_surface3d(
     )
     fig.colorbar(surf, ax=ax, label="Elevation (m)", shrink=0.5, pad=0.1)
 
-    lat_centre = float(data.lat.mean())
-    lon_scale = np.cos(np.radians(lat_centre))
+    x_range = x_vals.max() - x_vals.min()
+    y_range = y_vals.max() - y_vals.min()
+    if not is_projected(data):
+        # Correct for meridian convergence in geographic CRS
+        lat_centre = float(data[y_dim].mean())
+        x_range *= np.cos(np.radians(lat_centre))
+
     ax.set_box_aspect(
         [
-            (lon.max() - lon.min()) * lon_scale,
-            lat.max() - lat.min(),
+            x_range,
+            y_range,
             (z.max() - z.min()) * vertical_exaggeration / 1000,
         ]
     )
 
     ax.view_init(elev=elev, azim=azim)
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    x_label, y_label = axis_labels(data)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     ax.set_zlabel("Elevation (m)")
     plt.tight_layout()
     return fig, ax

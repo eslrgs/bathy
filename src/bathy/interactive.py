@@ -11,6 +11,7 @@ from matplotlib.lines import Line2D
 
 from bathy.plot import get_extent
 from bathy.profile import Profile, profile_from_coordinates
+from bathy.utils import axis_labels
 
 _COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#a65628"]
 
@@ -69,8 +70,9 @@ class _ProfileDrawer:
         ax_map.imshow(
             data.values, cmap=cmap, origin="lower", extent=extent, aspect="auto"
         )
-        ax_map.set_xlabel("Longitude (°)")
-        ax_map.set_ylabel("Latitude (°)")
+        x_label, y_label = axis_labels(data)
+        ax_map.set_xlabel(x_label)
+        ax_map.set_ylabel(y_label)
         ax_map.set_title("Draw profile (right-click: finish, double-click: done)")
 
         ax_profile.set_xlabel("Distance (km)")
@@ -123,14 +125,14 @@ class _ProfileDrawer:
     def _load_profiles(self, profiles: list[Profile]) -> None:
         """Populate the map with existing profiles for editing."""
         for prof in profiles:
-            lons = prof.metadata.get("path_lons")
-            lats = prof.metadata.get("path_lats")
-            if lons and lats:
-                coords = list(zip(lons, lats))
+            xs = prof.metadata.get("path_xs")
+            ys = prof.metadata.get("path_ys")
+            if xs and ys:
+                coords = list(zip(xs, ys))
             else:
                 coords = [
-                    (prof.start_lon, prof.start_lat),
-                    (prof.end_lon, prof.end_lat),
+                    (prof.start_x, prof.start_y),
+                    (prof.end_x, prof.end_y),
                 ]
             self._start_new_profile()
             ps = self._profile_states[-1]
@@ -142,11 +144,11 @@ class _ProfileDrawer:
     def _update_map_artists(self, idx: int) -> None:
         ps = self._profile_states[idx]
         if ps.coords:
-            lons, lats = zip(*ps.coords)
+            xs, ys = zip(*ps.coords)
         else:
-            lons, lats = [], []
-        ps.line_artist.set_data(lons, lats)
-        ps.marker_artist.set_data(lons, lats)
+            xs, ys = [], []
+        ps.line_artist.set_data(xs, ys)
+        ps.marker_artist.set_data(xs, ys)
 
     def _sync_and_replot(self) -> None:
         """Rebuild ``state["profiles"]`` and redraw the profile axis."""
@@ -311,11 +313,11 @@ class _ProfileDrawer:
         self._redraw()
 
     def _insert_point(
-        self, profile_idx: int, segment_idx: int, lon: float, lat: float
+        self, profile_idx: int, segment_idx: int, x: float, y: float
     ) -> None:
         """Insert a new waypoint between two existing ones."""
         ps = self._profile_states[profile_idx]
-        ps.coords.insert(segment_idx + 1, (lon, lat))
+        ps.coords.insert(segment_idx + 1, (x, y))
         self._update_map_artists(profile_idx)
         if ps.finished:
             self._sync_and_replot()

@@ -4,6 +4,7 @@ import numpy as np
 import xarray as xr
 
 from bathy.analysis import (
+    _cell_size_metres,
     aspect,
     bpi,
     curvature,
@@ -306,3 +307,21 @@ def test_geomorphons_ridge_behind_valley():
     # Centre cell sees both higher and lower terrain to the east,
     # so it must not be classified as flat (1) or peak (2) or pit (10).
     assert geom.values[10, 10] not in (1, 2, 10)
+
+
+# Projected CRS tests
+
+
+def test_cell_size_projected(fake_projected_data):
+    """Projected data returns cell sizes directly from coordinate spacing."""
+    dy, dx = _cell_size_metres(fake_projected_data)
+    expected = 10000 / 19  # 10 km range / 19 intervals
+    assert abs(dx - expected) < 1
+    assert abs(dy - expected) < 1
+
+
+def test_slope_projected(fake_projected_data):
+    """Slope works on projected data."""
+    slope_da = slope(fake_projected_data)
+    assert slope_da.shape == fake_projected_data.shape
+    assert (slope_da.values >= 0).all()

@@ -60,7 +60,12 @@ Load from GeoTIFF rasters:
 data = bathy.load_bathymetry("path/to/bathymetry.tif")
 ```
 
-GeoTIFF files are loaded using rioxarray with automatic coordinate renaming.
+GeoTIFF files are loaded using rioxarray. The CRS is read automatically:
+
+- **Geographic CRS** (e.g. EPSG:4326): coordinates are renamed to `lon`/`lat`
+- **Projected CRS** (e.g. UTM): coordinates are kept as `x`/`y` in metres
+
+All analysis and plotting functions adapt to the CRS automatically. See [Projected Coordinate Systems](projections.md) for details.
 
 ## Clipping to a region
 
@@ -89,8 +94,8 @@ data.to_netcdf("output.nc")
 `data` is a standard `xr.DataArray` — use xarray directly:
 
 ```python
-print(data.shape)           # Grid dimensions
-print(data.coords["lon"])   # Longitude coordinate
-print(data.coords["lat"])   # Latitude coordinate
-data                        # Rich repr in Jupyter
+print(data.shape)   # Grid dimensions
+print(data.dims)    # ('lat', 'lon') or ('y', 'x')
+print(data.coords)  # All coordinates
+data                 # Rich repr in Jupyter
 ```

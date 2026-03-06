@@ -5,6 +5,7 @@ import tempfile
 
 import numpy as np
 import pytest
+import rioxarray  # noqa: F401
 import xarray as xr
 
 from bathy.profile import extract_profile
@@ -62,6 +63,22 @@ def fake_profile(fake_data):
     return extract_profile(
         fake_data, start=(-9, 52), end=(-6, 53), num_points=20, name="Test Profile"
     )
+
+
+@pytest.fixture
+def fake_projected_data():
+    """DataArray with UTM-like projected coordinates (EPSG:32629)."""
+    da = xr.DataArray(
+        np.random.default_rng(42).random((20, 20)) * -100,
+        coords={
+            "x": np.linspace(500000, 510000, 20),
+            "y": np.linspace(5500000, 5510000, 20),
+        },
+        dims=["y", "x"],
+        name="elevation",
+    )
+    da = da.rio.write_crs("EPSG:32629")
+    return da
 
 
 @pytest.fixture

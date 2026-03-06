@@ -20,6 +20,7 @@ from bathy.profile import (
     gradient,
     knickpoints,
 )
+from bathy.utils import axis_labels, crs_axis_labels
 
 logger = logging.getLogger(__name__)
 
@@ -85,17 +86,17 @@ def plot_profile(
                 extent=extent,
                 aspect="auto",
             )
-        path_lons = profile.metadata.get(
-            "path_lons", [profile.start_lon, profile.end_lon]
-        )
-        path_lats = profile.metadata.get(
-            "path_lats", [profile.start_lat, profile.end_lat]
-        )
-        ax_map.plot(path_lons, path_lats, "r-", linewidth=2, label="Profile line")
-        ax_map.plot(path_lons[0], path_lats[0], "go", markersize=10, label="Start")
-        ax_map.plot(path_lons[-1], path_lats[-1], "ro", markersize=10, label="End")
-        ax_map.set_xlabel("Longitude (°)")
-        ax_map.set_ylabel("Latitude (°)")
+        path_xs = profile.metadata.get("path_xs", [profile.start_x, profile.end_x])
+        path_ys = profile.metadata.get("path_ys", [profile.start_y, profile.end_y])
+        ax_map.plot(path_xs, path_ys, "r-", linewidth=2, label="Profile line")
+        ax_map.plot(path_xs[0], path_ys[0], "go", markersize=10, label="Start")
+        ax_map.plot(path_xs[-1], path_ys[-1], "ro", markersize=10, label="End")
+        if bathymetry_data is not None:
+            x_label, y_label = axis_labels(bathymetry_data)
+        else:
+            x_label, y_label = crs_axis_labels(profile.crs)
+        ax_map.set_xlabel(x_label)
+        ax_map.set_ylabel(y_label)
         ax_map.legend()
     else:
         fig, ax_profile = plt.subplots(figsize=(12, 5))
@@ -310,14 +311,18 @@ def plot_profiles(
 
         for i, prof in enumerate(profiles, start=1):
             label = prof.name if prof.name else f"Profile {i}"
-            path_lons = prof.metadata.get("path_lons", [prof.start_lon, prof.end_lon])
-            path_lats = prof.metadata.get("path_lats", [prof.start_lat, prof.end_lat])
-            ax_map.plot(path_lons, path_lats, "-", linewidth=2, label=label)
-            ax_map.plot(path_lons[0], path_lats[0], "o", markersize=6)
-            ax_map.plot(path_lons[-1], path_lats[-1], "s", markersize=6)
+            path_xs = prof.metadata.get("path_xs", [prof.start_x, prof.end_x])
+            path_ys = prof.metadata.get("path_ys", [prof.start_y, prof.end_y])
+            ax_map.plot(path_xs, path_ys, "-", linewidth=2, label=label)
+            ax_map.plot(path_xs[0], path_ys[0], "o", markersize=6)
+            ax_map.plot(path_xs[-1], path_ys[-1], "s", markersize=6)
 
-        ax_map.set_xlabel("Longitude (°)")
-        ax_map.set_ylabel("Latitude (°)")
+        if bathymetry_data is not None:
+            x_label, y_label = axis_labels(bathymetry_data)
+        else:
+            x_label, y_label = crs_axis_labels(profiles[0].crs)
+        ax_map.set_xlabel(x_label)
+        ax_map.set_ylabel(y_label)
         ax_map.legend()
     else:
         fig, ax_profile = plt.subplots(figsize=(12, 6))
@@ -500,53 +505,57 @@ def plot_profiles_map(
     for i, prof in enumerate(profiles, start=1):
         label = prof.name if prof.name else f"Profile {i}"
 
-        if "path_lons" in prof.metadata and "path_lats" in prof.metadata:
-            lons = prof.metadata["path_lons"]
-            lats = prof.metadata["path_lats"]
-            ax.plot(lons, lats, "-", linewidth=2, label=label, **kwargs)
-            ax.plot(lons[0], lats[0], "o", markersize=8)
-            ax.plot(lons[-1], lats[-1], "s", markersize=8)
+        if "path_xs" in prof.metadata and "path_ys" in prof.metadata:
+            xs = prof.metadata["path_xs"]
+            ys = prof.metadata["path_ys"]
+            ax.plot(xs, ys, "-", linewidth=2, label=label, **kwargs)
+            ax.plot(xs[0], ys[0], "o", markersize=8)
+            ax.plot(xs[-1], ys[-1], "s", markersize=8)
         else:
             ax.plot(
-                [prof.start_lon, prof.end_lon],
-                [prof.start_lat, prof.end_lat],
+                [prof.start_x, prof.end_x],
+                [prof.start_y, prof.end_y],
                 "-",
                 linewidth=2,
                 label=label,
                 **kwargs,
             )
-            ax.plot(prof.start_lon, prof.start_lat, "o", markersize=8)
-            ax.plot(prof.end_lon, prof.end_lat, "s", markersize=8)
+            ax.plot(prof.start_x, prof.start_y, "o", markersize=8)
+            ax.plot(prof.end_x, prof.end_y, "s", markersize=8)
 
     if main_profile is not None:
         main_label = main_profile.name if main_profile.name else "Main Profile"
         ax.plot(
-            [main_profile.start_lon, main_profile.end_lon],
-            [main_profile.start_lat, main_profile.end_lat],
+            [main_profile.start_x, main_profile.end_x],
+            [main_profile.start_y, main_profile.end_y],
             "r-",
             linewidth=3,
             label=main_label,
             zorder=10,
         )
         ax.plot(
-            main_profile.start_lon,
-            main_profile.start_lat,
+            main_profile.start_x,
+            main_profile.start_y,
             "go",
             markersize=10,
             zorder=11,
             label="Start",
         )
         ax.plot(
-            main_profile.end_lon,
-            main_profile.end_lat,
+            main_profile.end_x,
+            main_profile.end_y,
             "rs",
             markersize=10,
             zorder=11,
             label="End",
         )
 
-    ax.set_xlabel("Longitude (°)")
-    ax.set_ylabel("Latitude (°)")
+    if bathymetry_data is not None:
+        x_label, y_label = axis_labels(bathymetry_data)
+    else:
+        x_label, y_label = crs_axis_labels(profiles[0].crs)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     if any(p.name for p in profiles) or main_profile is not None:
         ax.legend()
 

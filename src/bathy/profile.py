@@ -1,6 +1,7 @@
 """Bathymetric profile functions."""
 
 import logging
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -9,10 +10,13 @@ import numpy as np
 import polars as pl
 import xarray as xr
 from geographiclib.geodesic import Geodesic
+from pyproj import CRS
 from scipy.integrate import trapezoid
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
 from shapely.geometry import LineString
+
+from bathy.utils import get_crs, get_dim_names
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +35,16 @@ class Profile:
         Distances along profile (m)
     elevations : np.ndarray
         Elevation values along profile (m)
-    start_lon, start_lat : float
-        Starting coordinates
-    end_lon, end_lat : float
-        Ending coordinates
+    start_x, start_y : float
+        Starting coordinates (lon/lat or easting/northing)
+    end_x, end_y : float
+        Ending coordinates (lon/lat or easting/northing)
     name : str, optional
         Profile name
+    crs : pyproj.CRS, optional
+        Coordinate reference system
     metadata : dict
-        Additional metadata (includes path_lons, path_lats for plotting)
+        Additional metadata (includes path_xs, path_ys for plotting)
 
     Examples
     --------
@@ -50,11 +56,12 @@ class Profile:
 
     distances: np.ndarray
     elevations: np.ndarray
-    start_lon: float
-    start_lat: float
-    end_lon: float
-    end_lat: float
+    start_x: float
+    start_y: float
+    end_x: float
+    end_y: float
     name: str | None = None
+    crs: CRS | None = None
     metadata: dict = field(default_factory=dict)
 
     def __repr__(self) -> str:
@@ -70,21 +77,22 @@ class Profile:
 
 
 def _validate_coordinates(
-    data: xr.DataArray, lon: float, lat: float, param_name: str
+    data: xr.DataArray, x: float, y: float, param_name: str
 ) -> None:
     """Validate that coordinates are within data bounds."""
-    lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
-    lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
+    x_dim, y_dim = get_dim_names(data)
+    x_min, x_max = float(data[x_dim].min()), float(data[x_dim].max())
+    y_min, y_max = float(data[y_dim].min()), float(data[y_dim].max())
 
-    if not (lon_min <= lon <= lon_max):
+    if not (x_min <= x <= x_max):
         raise ValueError(
-            f"{param_name} longitude ({lon}) is outside "
-            f"DEM bounds [{lon_min:.2f}, {lon_max:.2f}]"
+            f"{param_name} {x_dim} ({x}) is outside "
+            f"DEM bounds [{x_min:.2f}, {x_max:.2f}]"
         )
-    if not (lat_min <= lat <= lat_max):
+    if not (y_min <= y <= y_max):
         raise ValueError(
-            f"{param_name} latitude ({lat}) is outside "
-            f"DEM bounds [{lat_min:.2f}, {lat_max:.2f}]"
+            f"{param_name} {y_dim} ({y}) is outside "
+            f"DEM bounds [{y_min:.2f}, {y_max:.2f}]"
         )
 
 
@@ -114,12 +122,13 @@ def _ensure_descending(
 
 
 def _calculate_num_points(
-    start_lon: float,
-    start_lat: float,
-    end_lon: float,
-    end_lat: float,
+    start_x: float,
+    start_y: float,
+    end_x: float,
+    end_y: float,
     num_points: int | None,
     point_spacing: float | None,
+    crs: CRS | None = None,
 ) -> int:
     """Calculate number of points for the profile."""
     if num_points is None and point_spacing is None:
@@ -137,46 +146,59 @@ def _calculate_num_points(
     if point_spacing <= 0:
         raise ValueError(f"point_spacing must be positive, got {point_spacing}")
 
-    geod = Geodesic.WGS84
-    result = geod.Inverse(start_lat, start_lon, end_lat, end_lon)
-    total_distance_m = result["s12"]
+    if crs is not None and crs.is_projected:
+        total_distance_m = math.hypot(end_x - start_x, end_y - start_y)
+    else:
+        geod = Geodesic.WGS84
+        result = geod.Inverse(start_y, start_x, end_y, end_x)
+        total_distance_m = result["s12"]
     return max(2, int(np.ceil(total_distance_m / point_spacing)) + 1)
 
 
 def _extract_profile_arrays(
     data: xr.DataArray,
-    start_lon: float,
-    start_lat: float,
-    end_lon: float,
-    end_lat: float,
+    start_x: float,
+    start_y: float,
+    end_x: float,
+    end_y: float,
     n: int,
+    crs: CRS | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Extract elevation and distance arrays along a geodesic profile.
+    Extract elevation and distance arrays along a profile.
 
-    Points are placed at equal geodesic intervals along the great-circle
-    path between start and end coordinates.
+    For geographic CRS, points are placed along a geodesic.  For projected
+    CRS, points are placed along a straight line with Euclidean distances.
 
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
         (elevations, distances_m) arrays
     """
-    geod = Geodesic.WGS84
-    line = geod.InverseLine(start_lat, start_lon, end_lat, end_lon)
-    total_m = line.s13
-    distances_m = np.linspace(0, total_m, n)
+    x_dim, y_dim = get_dim_names(data)
 
-    lons = np.zeros(n)
-    lats = np.zeros(n)
-    for i, d_m in enumerate(distances_m):
-        pos = line.Position(d_m)
-        lons[i] = pos["lon2"]
-        lats[i] = pos["lat2"]
+    if crs is not None and crs.is_projected:
+        xs = np.linspace(start_x, end_x, n)
+        ys = np.linspace(start_y, end_y, n)
+        distances_m = np.sqrt((xs - xs[0]) ** 2 + (ys - ys[0]) ** 2)
+    else:
+        geod = Geodesic.WGS84
+        line = geod.InverseLine(start_y, start_x, end_y, end_x)
+        total_m = line.s13
+        distances_m = np.linspace(0, total_m, n)
 
-    lon_da = xr.DataArray(lons, dims="points")
-    lat_da = xr.DataArray(lats, dims="points")
-    elevations = data.sel(lon=lon_da, lat=lat_da, method="nearest").values.astype(float)
+        xs = np.zeros(n)
+        ys = np.zeros(n)
+        for i, d_m in enumerate(distances_m):
+            pos = line.Position(d_m)
+            xs[i] = pos["lon2"]
+            ys[i] = pos["lat2"]
+
+    x_da = xr.DataArray(xs, dims="points")
+    y_da = xr.DataArray(ys, dims="points")
+    elevations = data.sel({x_dim: x_da, y_dim: y_da}, method="nearest").values.astype(
+        float
+    )
 
     return elevations, distances_m
 
@@ -244,9 +266,9 @@ def extract_profile(
     data : xr.DataArray
         Elevation data
     start : tuple[float, float]
-        Starting coordinates (lon, lat)
+        Starting coordinates (lon, lat) or (easting, northing)
     end : tuple[float, float]
-        Ending coordinates (lon, lat)
+        Ending coordinates (lon, lat) or (easting, northing)
     num_points : int, optional
         Number of points along profile. Cannot be used with point_spacing.
         Default: 100 if neither num_points nor point_spacing is specified.
@@ -268,31 +290,33 @@ def extract_profile(
     ...     data, start=(-9.5, 52.0), end=(-5.5, 52.0), point_spacing=1000.0
     ... )
     """
-    start_lon, start_lat = start
-    end_lon, end_lat = end
+    start_x, start_y = start
+    end_x, end_y = end
+    crs = get_crs(data)
 
-    _validate_coordinates(data, start_lon, start_lat, "start")
-    _validate_coordinates(data, end_lon, end_lat, "end")
+    _validate_coordinates(data, start_x, start_y, "start")
+    _validate_coordinates(data, end_x, end_y, "end")
 
     n = _calculate_num_points(
-        start_lon, start_lat, end_lon, end_lat, num_points, point_spacing
+        start_x, start_y, end_x, end_y, num_points, point_spacing, crs
     )
     elevations, distances = _extract_profile_arrays(
-        data, start_lon, start_lat, end_lon, end_lat, n
+        data, start_x, start_y, end_x, end_y, n, crs
     )
 
     meta = dict(metadata) if metadata else {}
-    meta["path_lons"] = [start_lon, end_lon]
-    meta["path_lats"] = [start_lat, end_lat]
+    meta["path_xs"] = [start_x, end_x]
+    meta["path_ys"] = [start_y, end_y]
 
     return Profile(
         distances=distances,
         elevations=elevations,
-        start_lon=start_lon,
-        start_lat=start_lat,
-        end_lon=end_lon,
-        end_lat=end_lat,
+        start_x=start_x,
+        start_y=start_y,
+        end_x=end_x,
+        end_y=end_y,
         name=name,
+        crs=crs,
         metadata=meta,
     )
 
@@ -305,7 +329,7 @@ def profile_from_coordinates(
     metadata: dict | None = None,
 ) -> Profile:
     """
-    Create a Profile from a list of (lon, lat) coordinates.
+    Create a Profile from a list of (x, y) coordinates.
 
     By default, samples only at the given vertices. Use ``point_spacing``
     to interpolate along each segment at regular intervals.
@@ -315,10 +339,10 @@ def profile_from_coordinates(
     data : xr.DataArray
         Elevation data
     coordinates : list[tuple[float, float]]
-        List of (lon, lat) coordinate pairs defining the path
+        List of (x, y) coordinate pairs defining the path
     point_spacing : float, optional
         Spacing between sample points in metres. When provided, each segment
-        is interpolated along the geodesic at this interval.
+        is interpolated at this interval.
     name : str, optional
         Name for this profile
     metadata : dict, optional
@@ -339,23 +363,26 @@ def profile_from_coordinates(
     if point_spacing is not None and point_spacing <= 0:
         raise ValueError(f"point_spacing must be positive, got {point_spacing}")
 
-    lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
-    lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
-    for i, (lon, lat) in enumerate(coordinates):
-        if not (lon_min <= lon <= lon_max):
+    x_dim, y_dim = get_dim_names(data)
+    crs = get_crs(data)
+    projected = crs is not None and crs.is_projected
+
+    x_min, x_max = float(data[x_dim].min()), float(data[x_dim].max())
+    y_min, y_max = float(data[y_dim].min()), float(data[y_dim].max())
+    for i, (cx, cy) in enumerate(coordinates):
+        if not (x_min <= cx <= x_max):
             raise ValueError(
-                f"coordinates[{i}] longitude ({lon}) is outside "
-                f"DEM bounds [{lon_min:.2f}, {lon_max:.2f}]"
+                f"coordinates[{i}] {x_dim} ({cx}) is outside "
+                f"DEM bounds [{x_min:.2f}, {x_max:.2f}]"
             )
-        if not (lat_min <= lat <= lat_max):
+        if not (y_min <= cy <= y_max):
             raise ValueError(
-                f"coordinates[{i}] latitude ({lat}) is outside "
-                f"DEM bounds [{lat_min:.2f}, {lat_max:.2f}]"
+                f"coordinates[{i}] {y_dim} ({cy}) is outside "
+                f"DEM bounds [{y_min:.2f}, {y_max:.2f}]"
             )
 
-    start_lon, start_lat = coordinates[0]
-    end_lon, end_lat = coordinates[-1]
-    geod = Geodesic.WGS84
+    start_x, start_y = coordinates[0]
+    end_x, end_y = coordinates[-1]
 
     if point_spacing is not None:
         all_elevations = []
@@ -363,24 +390,26 @@ def profile_from_coordinates(
         cumulative_m = 0.0
 
         for i in range(len(coordinates) - 1):
-            seg_start_lon, seg_start_lat = coordinates[i]
-            seg_end_lon, seg_end_lat = coordinates[i + 1]
+            sx, sy = coordinates[i]
+            ex, ey = coordinates[i + 1]
 
             n = _calculate_num_points(
-                seg_start_lon,
-                seg_start_lat,
-                seg_end_lon,
-                seg_end_lat,
+                sx,
+                sy,
+                ex,
+                ey,
                 num_points=None,
                 point_spacing=point_spacing,
+                crs=crs,
             )
             elevations, seg_distances = _extract_profile_arrays(
                 data,
-                seg_start_lon,
-                seg_start_lat,
-                seg_end_lon,
-                seg_end_lat,
+                sx,
+                sy,
+                ex,
+                ey,
                 n,
+                crs,
             )
 
             if i > 0:
@@ -398,33 +427,38 @@ def profile_from_coordinates(
         elev_list = []
         cumulative_m = 0.0
 
-        for i, (lon, lat) in enumerate(coordinates):
-            elev = float(data.sel(lon=lon, lat=lat, method="nearest").values)
+        for i, (cx, cy) in enumerate(coordinates):
+            elev = float(data.sel({x_dim: cx, y_dim: cy}, method="nearest").values)
             elev_list.append(elev)
 
             if i == 0:
                 dist_list.append(0.0)
             else:
-                prev_lon, prev_lat = coordinates[i - 1]
-                result = geod.Inverse(prev_lat, prev_lon, lat, lon)
-                cumulative_m += result["s12"]
+                px, py = coordinates[i - 1]
+                if projected:
+                    cumulative_m += math.hypot(cx - px, cy - py)
+                else:
+                    geod = Geodesic.WGS84
+                    result = geod.Inverse(py, px, cy, cx)
+                    cumulative_m += result["s12"]
                 dist_list.append(cumulative_m)
 
         dist_array = np.array(dist_list)
         elev_array = np.array(elev_list)
 
     meta = dict(metadata) if metadata else {}
-    meta["path_lons"] = [c[0] for c in coordinates]
-    meta["path_lats"] = [c[1] for c in coordinates]
+    meta["path_xs"] = [c[0] for c in coordinates]
+    meta["path_ys"] = [c[1] for c in coordinates]
 
     return Profile(
         distances=dist_array,
         elevations=elev_array,
-        start_lon=start_lon,
-        start_lat=start_lat,
-        end_lon=end_lon,
-        end_lat=end_lat,
+        start_x=start_x,
+        start_y=start_y,
+        end_x=end_x,
+        end_y=end_y,
         name=name,
+        crs=crs,
         metadata=meta,
     )
 
@@ -469,61 +503,103 @@ def cross_sections(
     if section_width_m <= 0:
         raise ValueError(f"section_width_m must be positive, got {section_width_m}")
 
+    crs = profile.crs
+    projected = crs is not None and crs.is_projected
+
     total_distance_m = profile.distances[-1]
     section_distances_m = np.arange(0, total_distance_m + interval_m, interval_m)
     if section_distances_m[-1] > total_distance_m:
         section_distances_m = section_distances_m[:-1]
 
-    geod = Geodesic.WGS84
-
-    path_lons = profile.metadata.get("path_lons", [profile.start_lon, profile.end_lon])
-    path_lats = profile.metadata.get("path_lats", [profile.start_lat, profile.end_lat])
-
-    # Build geodesic segments along the actual path
-    seg_lines = []
-    seg_cum_m = [0.0]
-    for j in range(len(path_lons) - 1):
-        seg = geod.InverseLine(
-            path_lats[j], path_lons[j], path_lats[j + 1], path_lons[j + 1]
-        )
-        seg_lines.append(seg)
-        seg_cum_m.append(seg_cum_m[-1] + seg.s13)
+    path_xs = profile.metadata.get("path_xs", [profile.start_x, profile.end_x])
+    path_ys = profile.metadata.get("path_ys", [profile.start_y, profile.end_y])
 
     half_width_m = section_width_m / 2
-    sections = []
-    for i, dist_m in enumerate(section_distances_m):
-        seg_idx = min(
-            np.searchsorted(seg_cum_m, dist_m, side="right") - 1,
-            len(seg_lines) - 1,
-        )
-        local_m = dist_m - seg_cum_m[seg_idx]
-        pos = seg_lines[seg_idx].Position(local_m)
-        center_lon = pos["lon2"]
-        center_lat = pos["lat2"]
-        local_bearing = pos["azi2"]
 
-        perp_bearing = (local_bearing + 90) % 360
-
-        start_result = geod.Direct(center_lat, center_lon, perp_bearing, half_width_m)
-        start_lon = start_result["lon2"]
-        start_lat = start_result["lat2"]
-
-        end_bearing = (perp_bearing + 180) % 360
-        end_result = geod.Direct(center_lat, center_lon, end_bearing, half_width_m)
-        end_lon = end_result["lon2"]
-        end_lat = end_result["lat2"]
-
-        section_name = f"Section_{i + 1}_at_{dist_m:.0f}m"
-        sections.append(
-            extract_profile(
-                data,
-                start=(start_lon, start_lat),
-                end=(end_lon, end_lat),
-                num_points=num_points,
-                point_spacing=point_spacing,
-                name=section_name,
+    if projected:
+        # Build Euclidean segments
+        seg_cum_m = [0.0]
+        for j in range(len(path_xs) - 1):
+            seg_cum_m.append(
+                seg_cum_m[-1]
+                + math.hypot(path_xs[j + 1] - path_xs[j], path_ys[j + 1] - path_ys[j])
             )
-        )
+
+        sections = []
+        for i, dist_m in enumerate(section_distances_m):
+            seg_idx = min(
+                int(np.searchsorted(seg_cum_m, dist_m, side="right")) - 1,
+                len(path_xs) - 2,
+            )
+            t = (
+                (dist_m - seg_cum_m[seg_idx])
+                / (seg_cum_m[seg_idx + 1] - seg_cum_m[seg_idx])
+                if seg_cum_m[seg_idx + 1] != seg_cum_m[seg_idx]
+                else 0.0
+            )
+            cx = path_xs[seg_idx] + t * (path_xs[seg_idx + 1] - path_xs[seg_idx])
+            cy = path_ys[seg_idx] + t * (path_ys[seg_idx + 1] - path_ys[seg_idx])
+            dx = path_xs[seg_idx + 1] - path_xs[seg_idx]
+            dy = path_ys[seg_idx + 1] - path_ys[seg_idx]
+            bearing = math.atan2(dx, dy)
+            perp = bearing + math.pi / 2
+
+            sx = cx + half_width_m * math.sin(perp)
+            sy = cy + half_width_m * math.cos(perp)
+            ex = cx - half_width_m * math.sin(perp)
+            ey = cy - half_width_m * math.cos(perp)
+
+            sections.append(
+                extract_profile(
+                    data,
+                    start=(sx, sy),
+                    end=(ex, ey),
+                    num_points=num_points,
+                    point_spacing=point_spacing,
+                    name=f"Section_{i + 1}_at_{dist_m:.0f}m",
+                )
+            )
+    else:
+        geod = Geodesic.WGS84
+
+        seg_lines = []
+        seg_cum_m = [0.0]
+        for j in range(len(path_xs) - 1):
+            seg = geod.InverseLine(
+                path_ys[j], path_xs[j], path_ys[j + 1], path_xs[j + 1]
+            )
+            seg_lines.append(seg)
+            seg_cum_m.append(seg_cum_m[-1] + seg.s13)
+
+        sections = []
+        for i, dist_m in enumerate(section_distances_m):
+            seg_idx = min(
+                int(np.searchsorted(seg_cum_m, dist_m, side="right")) - 1,
+                len(seg_lines) - 1,
+            )
+            local_m = dist_m - seg_cum_m[seg_idx]
+            pos = seg_lines[seg_idx].Position(local_m)
+            center_x = pos["lon2"]
+            center_y = pos["lat2"]
+            local_bearing = pos["azi2"]
+
+            perp_bearing = (local_bearing + 90) % 360
+
+            start_result = geod.Direct(center_y, center_x, perp_bearing, half_width_m)
+            end_result = geod.Direct(
+                center_y, center_x, (perp_bearing + 180) % 360, half_width_m
+            )
+
+            sections.append(
+                extract_profile(
+                    data,
+                    start=(start_result["lon2"], start_result["lat2"]),
+                    end=(end_result["lon2"], end_result["lat2"]),
+                    num_points=num_points,
+                    point_spacing=point_spacing,
+                    name=f"Section_{i + 1}_at_{dist_m:.0f}m",
+                )
+            )
 
     return sections
 
@@ -594,13 +670,23 @@ def profiles_from_gdf(
     --------
     >>> profiles = profiles_from_gdf(data, gdf, id_column="name")
     """
-    if gdf.crs is not None and not gdf.crs.is_geographic:
-        gdf = gdf.to_crs("EPSG:4326")
+    data_crs = get_crs(data)
+    projected = data_crs is not None and data_crs.is_projected
 
+    if projected:
+        if gdf.crs is not None and gdf.crs != data_crs:
+            raise ValueError(
+                f"GeoDataFrame CRS ({gdf.crs}) does not match data CRS ({data_crs})"
+            )
+    else:
+        if gdf.crs is not None and not gdf.crs.is_geographic:
+            gdf = gdf.to_crs("EPSG:4326")
+
+    x_dim, y_dim = get_dim_names(data)
     profiles = []
     skipped = 0
-    lon_min, lon_max = float(data.lon.min()), float(data.lon.max())
-    lat_min, lat_max = float(data.lat.min()), float(data.lat.max())
+    x_min, x_max = float(data[x_dim].min()), float(data[x_dim].max())
+    y_min, y_max = float(data[y_dim].min()), float(data[y_dim].max())
 
     for seq, (_, row) in enumerate(gdf.iterrows(), start=1):
         geom = row.geometry
@@ -622,8 +708,7 @@ def profiles_from_gdf(
             coords = [(c[0], c[1]) for c in line.coords]
 
             within_bounds = any(
-                lon_min <= lon <= lon_max and lat_min <= lat <= lat_max
-                for lon, lat in coords
+                x_min <= cx <= x_max and y_min <= cy <= y_max for cx, cy in coords
             )
             if not within_bounds:
                 skipped += 1
@@ -975,7 +1060,6 @@ def to_gdf(profiles: Profile | list[Profile]) -> gpd.GeoDataFrame:
     -------
     geopandas.GeoDataFrame
         One row per profile with LineString geometry and key statistics.
-        CRS is EPSG:4326.
 
     Examples
     --------
@@ -992,7 +1076,7 @@ def to_gdf(profiles: Profile | list[Profile]) -> gpd.GeoDataFrame:
     rows = []
     geometries = []
     for p in profiles:
-        if "path_lons" not in p.metadata or "path_lats" not in p.metadata:
+        if "path_xs" not in p.metadata or "path_ys" not in p.metadata:
             raise ValueError(
                 f"Profile {p.name!r} is missing path geometry in metadata. "
                 "Create profiles using extract_profile() or profile_from_coordinates()."
@@ -1008,8 +1092,7 @@ def to_gdf(profiles: Profile | list[Profile]) -> gpd.GeoDataFrame:
             }
         )
         rows.append(row)
-        geometries.append(
-            LineString(zip(p.metadata["path_lons"], p.metadata["path_lats"]))
-        )
+        geometries.append(LineString(zip(p.metadata["path_xs"], p.metadata["path_ys"])))
 
-    return gpd.GeoDataFrame(rows, geometry=geometries, crs="EPSG:4326")
+    out_crs = profiles[0].crs or "EPSG:4326"
+    return gpd.GeoDataFrame(rows, geometry=geometries, crs=out_crs)

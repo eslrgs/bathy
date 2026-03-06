@@ -45,6 +45,7 @@ nav:
       - Quick Start: getting-started/quickstart.md
   - User Guide:
       - Loading Data: guide/loading-data.md
+      - Projected Coordinate Systems: guide/projections.md
       - Profiles: guide/profiles.md
       - Visualisation: guide/visualisation.md
   - API Reference:

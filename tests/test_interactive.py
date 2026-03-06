@@ -286,8 +286,8 @@ def test_drag_waypoint_on_active_profile(fake_data):
 
     assert len(state["profiles"]) == 1
     prof = state["profiles"][0]
-    assert prof.start_lon == -9
-    assert prof.start_lat == 51
+    assert prof.start_x == -9
+    assert prof.start_y == 51
 
 
 def test_drag_waypoint_on_finished_profile(fake_data):
@@ -309,8 +309,8 @@ def test_drag_waypoint_on_finished_profile(fake_data):
 
     # Profile should have been recalculated with new start
     prof = state["profiles"][0]
-    assert prof.start_lon == -9
-    assert prof.start_lat == 51
+    assert prof.start_x == -9
+    assert prof.start_y == 51
     assert not (prof.elevations == original_elevations).all()
 
 

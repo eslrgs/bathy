@@ -37,11 +37,24 @@ _GEOMORPHON_COLORS = [
 
 
 def _cell_size_metres(data: xr.DataArray) -> tuple[float, float]:
-    """Return (dy, dx) cell size in metres using geodesic measurement."""
-    lat_spacing = np.abs(np.diff(data.lat.values).mean())
-    lon_spacing = np.abs(np.diff(data.lon.values).mean())
-    lat_centre = float(data.lat.mean())
-    lon_centre = float(data.lon.mean())
+    """Return (dy, dx) cell size in metres.
+
+    For projected CRS the coordinate spacing is already in metres.
+    For geographic CRS a geodesic measurement on WGS84 is used.
+    """
+    from bathy.utils import get_dim_names, is_projected  # noqa: PLC0415
+
+    x_dim, y_dim = get_dim_names(data)
+
+    if is_projected(data):
+        dy = float(np.abs(np.diff(data[y_dim].values).mean()))
+        dx = float(np.abs(np.diff(data[x_dim].values).mean()))
+        return dy, dx
+
+    lat_spacing = np.abs(np.diff(data[y_dim].values).mean())
+    lon_spacing = np.abs(np.diff(data[x_dim].values).mean())
+    lat_centre = float(data[y_dim].mean())
+    lon_centre = float(data[x_dim].mean())
 
     geod = Geodesic.WGS84
     dy = geod.Inverse(lat_centre, lon_centre, lat_centre + lat_spacing, lon_centre)[
@@ -67,14 +80,28 @@ def _gradients(
 ) -> tuple[np.ndarray, np.ndarray, float, np.ndarray]:
     """Return (gy, gx, dy, dx_rows) for gradient computation.
 
-    East-west cell size is computed per latitude row to account for
-    convergence of meridians.
+    For geographic CRS, east-west cell size is computed per latitude row
+    to account for convergence of meridians.  For projected CRS, cell
+    sizes are uniform.
     """
+    from bathy.utils import get_dim_names, is_projected  # noqa: PLC0415
+
+    x_dim, y_dim = get_dim_names(data)
+    z = data.values.astype(float)
+
+    if is_projected(data):
+        dy = float(np.abs(np.diff(data[y_dim].values).mean()))
+        dx = float(np.abs(np.diff(data[x_dim].values).mean()))
+        dx_rows = np.full(z.shape[0], dx)
+        gy = np.gradient(z, dy, axis=0)
+        gx = np.gradient(z, dx, axis=1)
+        return gy, gx, dy, dx_rows
+
     geod = Geodesic.WGS84
-    lat_spacing = np.abs(np.diff(data.lat.values).mean())
-    lon_spacing = np.abs(np.diff(data.lon.values).mean())
-    lon_centre = float(data.lon.mean())
-    lat_centre = float(data.lat.mean())
+    lat_spacing = np.abs(np.diff(data[y_dim].values).mean())
+    lon_spacing = np.abs(np.diff(data[x_dim].values).mean())
+    lon_centre = float(data[x_dim].mean())
+    lat_centre = float(data[y_dim].mean())
 
     dy = geod.Inverse(lat_centre, lon_centre, lat_centre + lat_spacing, lon_centre)[
         "s12"
@@ -85,11 +112,10 @@ def _gradients(
             geod.Inverse(float(lat), lon_centre, float(lat), lon_centre + lon_spacing)[
                 "s12"
             ]
-            for lat in data.lat.values
+            for lat in data[y_dim].values
         ]
     )
 
-    z = data.values.astype(float)
     gy = np.gradient(z, dy, axis=0)
     gx = np.empty_like(z, dtype=float)
     for i, dx in enumerate(dx_rows):

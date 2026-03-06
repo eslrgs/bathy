@@ -152,15 +152,22 @@ def _load_geotiff(
     if "band" in da.dims:
         da = da.sel(band=1)
 
+    # Only rename x/y → lon/lat for geographic CRS; keep x/y for projected
     if "x" in da.dims and "y" in da.dims:
-        da = da.rename({"x": "lon", "y": "lat"})
+        crs = da.rio.crs
+        if crs is None or crs.is_geographic:
+            da = da.rename({"x": "lon", "y": "lat"})
+
+    from bathy.utils import get_dim_names  # noqa: PLC0415
+
+    x_dim, y_dim = get_dim_names(da)
 
     if lon_range is not None:
-        lon_min, lon_max = min(lon_range), max(lon_range)
-        da = da.where((da.lon >= lon_min) & (da.lon <= lon_max), drop=True)
+        lo, hi = min(lon_range), max(lon_range)
+        da = da.where((da[x_dim] >= lo) & (da[x_dim] <= hi), drop=True)
     if lat_range is not None:
-        lat_min, lat_max = min(lat_range), max(lat_range)
-        da = da.where((da.lat >= lat_min) & (da.lat <= lat_max), drop=True)
+        lo, hi = min(lat_range), max(lat_range)
+        da = da.where((da[y_dim] >= lo) & (da[y_dim] <= hi), drop=True)
 
     return da
 
@@ -343,7 +350,7 @@ def load_gebco_opendap(
 def to_geotiff(
     data: xr.DataArray,
     filepath: str | Path,
-    crs: str = "EPSG:4326",
+    crs: str | None = None,
     **kwargs,
 ) -> None:
     """
@@ -355,8 +362,9 @@ def to_geotiff(
         Elevation data
     filepath : str or Path
         Output GeoTIFF file path
-    crs : str, default 'EPSG:4326'
-        Coordinate reference system
+    crs : str, optional
+        Coordinate reference system.  Only used when the data has no CRS
+        attached; defaults to ``"EPSG:4326"`` for geographic data.
     **kwargs
         Additional arguments passed to rioxarray.to_raster()
 
@@ -369,5 +377,5 @@ def to_geotiff(
         raise FileNotFoundError(f"Output directory does not exist: {parent}")
 
     if data.rio.crs is None:
-        data = data.rio.write_crs(crs)
+        data = data.rio.write_crs(crs or "EPSG:4326")
     data.rio.to_raster(filepath, **kwargs)
