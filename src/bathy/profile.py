@@ -707,7 +707,7 @@ def profiles_from_gdf(
         for sub_idx, line in enumerate(linestrings):
             coords = [(c[0], c[1]) for c in line.coords]
 
-            within_bounds = any(
+            within_bounds = all(
                 x_min <= cx <= x_max and y_min <= cy <= y_max for cx, cy in coords
             )
             if not within_bounds:

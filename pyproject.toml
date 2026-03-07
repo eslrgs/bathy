@@ -31,6 +31,7 @@ dependencies = [
     "rioxarray>=0.15.0",
     "polars>=1.0.0",
     "tqdm>=4.66.0",
+    "pooch>=1.7.0",
 ]
 
 [project.urls]
@@ -54,6 +55,7 @@ dev = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.1",
     "mkdocstrings[python]>=1.0.3",
+    "mkdocs-jupyter>=0.25.0",
 ]
 
 [build-system]
@@ -61,7 +63,7 @@ requires = ["uv_build>=0.9.18,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-source-exclude = ["tests/", "notebooks/", "docs/", "data/", "site/", "**/.DS_Store"]
+source-exclude = ["tests/", "examples/", "docs/", "data/", "site/", "**/.DS_Store"]
 wheel-exclude = ["**/.DS_Store"]
 
 [tool.ruff]

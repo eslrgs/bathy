@@ -28,7 +28,7 @@ result["profiles"]  # list of drawn Profile objects
 - **Shift-click** on a waypoint to delete it
 - **Click on a line segment** to insert a new waypoint between two existing ones
 
-The profile plot on the right updates as you draw and edit. See the [interactive notebook](https://github.com/eslrgs/bathy/blob/main/notebooks/interactive.ipynb) for a worked example.
+The profile plot on the right updates as you draw and edit. See the [interactive example](https://github.com/eslrgs/bathy/blob/main/examples/interactive.ipynb) for a worked example.
 
 ### Saving and reloading
 

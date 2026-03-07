@@ -28,6 +28,12 @@ theme:
 
 plugins:
   - search
+  - mkdocs-jupyter:
+      execute: true
+      include: ["examples/*.ipynb"]
+      execute_ignore: ["examples/interactive.ipynb"]
+      kernel_name: bathy
+      allow_errors: false
   - mkdocstrings:
       handlers:
         python:
@@ -48,6 +54,10 @@ nav:
       - Projected Coordinate Systems: guide/projections.md
       - Profiles: guide/profiles.md
       - Visualisation: guide/visualisation.md
+  - Examples:
+      - Basic Usage: examples/basic_usage.ipynb
+      - Profiles: examples/profiles.ipynb
+      - Interactive: examples/interactive.ipynb
   - API Reference:
       - IO: api/io.md
       - Analysis: api/analysis.md

@@ -15,6 +15,7 @@ from bathy.analysis import (
     slope,
     summary,
 )
+from bathy.datasets import sample_data
 from bathy.interactive import draw_profile
 from bathy.io import (
     list_regions,
@@ -65,6 +66,8 @@ from bathy.profile_plot import (
 
 __version__ = version("bathy")
 __all__ = [
+    # Datasets
+    "sample_data",
     # IO
     "list_regions",
     "load_bathymetry",

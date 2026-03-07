@@ -77,7 +77,7 @@ data = bathy.load_gebco_opendap(region="mediterranean")
 
 ## Examples
 
-See [notebooks/basic_usage.ipynb](notebooks/basic_usage.ipynb), [notebooks/profiles.ipynb](notebooks/profiles.ipynb), and [notebooks/interactive.ipynb](notebooks/interactive.ipynb).
+See [examples/basic_usage.py](examples/basic_usage.py), [examples/profiles.py](examples/profiles.py), and [examples/interactive.ipynb](examples/interactive.ipynb).
 
 ## Development
 
