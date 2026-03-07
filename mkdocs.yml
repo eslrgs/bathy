@@ -29,11 +29,7 @@ theme:
 plugins:
   - search
   - mkdocs-jupyter:
-      execute: true
-      include: ["examples/*.ipynb"]
-      execute_ignore: ["examples/interactive.ipynb"]
-      kernel_name: bathy
-      allow_errors: false
+      execute: false
   - mkdocstrings:
       handlers:
         python:
