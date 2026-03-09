@@ -172,7 +172,8 @@ bathy.plot_profile(prof, smooth=3.0)
 ### With canyons highlighted
 
 ```python
-bathy.plot_canyons(prof, prominence=500)
+canyons = bathy.get_canyons(prof, prominence=500)
+bathy.plot_canyons(prof, canyons)
 ```
 
 ### With knickpoints

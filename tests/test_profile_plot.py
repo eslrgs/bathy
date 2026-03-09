@@ -75,5 +75,6 @@ def test_plot_knickpoints(fake_data):
 
 def test_plot_canyons(fake_data):
     prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=50)
-    fig, axes = bathy.plot_canyons(prof)
+    canyons = bathy.get_canyons(prof, prominence=5)
+    fig, axes = bathy.plot_canyons(prof, canyons)
     assert isinstance(fig, Figure)

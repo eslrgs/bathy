@@ -16,7 +16,6 @@ from bathy.profile import (
     Profile,
     _ensure_descending,
     _normalise_profile,
-    get_canyons,
     gradient,
     knickpoints,
 )
@@ -190,9 +189,7 @@ def plot_gradient(profile: Profile, **kwargs) -> tuple[Figure, list[Axes]]:
 
 def plot_canyons(
     profile: Profile,
-    canyons: pl.DataFrame | None = None,
-    prominence: float | None = None,
-    smooth: float | None = None,
+    canyons: pl.DataFrame,
     **kwargs,
 ) -> tuple[Figure, list[Axes]]:
     """
@@ -201,12 +198,8 @@ def plot_canyons(
     Parameters
     ----------
     profile : Profile
-    canyons : pl.DataFrame, optional
-        Canyon data from get_canyons(). Detected if None.
-    prominence : float, optional
-        Minimum prominence for detection (ignored if canyons provided).
-    smooth : float, optional
-        Smoothing sigma (ignored if canyons provided).
+    canyons : pl.DataFrame
+        Canyon data from ``get_canyons()``.
     **kwargs
         Additional arguments passed to plot_profile()
 
@@ -214,20 +207,18 @@ def plot_canyons(
     -------
     Figure, list[Axes]
     """
-    if canyons is None:
-        canyons = get_canyons(profile, prominence=prominence, smooth=smooth)
 
     if len(canyons) == 0:
         logger.info("No canyons detected. Try adjusting prominence or smoothing.")
-        return plot_profile(profile, smooth=smooth, **kwargs)
+        return plot_profile(profile, **kwargs)
 
-    fig, axes = plot_profile(profile, smooth=smooth, **kwargs)
+    fig, axes = plot_profile(profile, **kwargs)
     ax = axes[-1]
 
     for row in canyons.iter_rows(named=True):
         floor_km = row["floor_distance"] / 1000
         floor_elev = row["floor_elevation"]
-        shoulder_elev = floor_elev + row["depth"]
+        shoulder_elev = row["shoulder_elevation"]
         ws_km, we_km = row["width_start"] / 1000, row["width_end"] / 1000
 
         ax.plot(floor_km, floor_elev, "ro", markersize=8, zorder=10)

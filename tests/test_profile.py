@@ -382,6 +382,7 @@ def test_canyon_dataframe_columns(fake_data):
     expected_columns = {
         "floor_distance",
         "floor_elevation",
+        "shoulder_elevation",
         "width_start",
         "width_end",
         "width",
@@ -434,6 +435,93 @@ def test_canyon_measurements_in_metres(fake_data):
         assert all(canyons["floor_distance"] >= 0)
         assert all(canyons["width"] >= 0)
         assert all(canyons["depth"] >= 0)
+
+
+def _make_canyon_profile(
+    segments: list[tuple[float, float, float, float]],
+    n: int = 2001,
+) -> Profile:
+    """Build a piecewise-linear profile from (d0, d1, e0, e1) segments."""
+    d_min = segments[0][0]
+    d_max = segments[-1][1]
+    distances = np.linspace(d_min, d_max, n)
+    elevations = np.empty(n)
+    for d0, d1, e0, e1 in segments:
+        mask = (distances >= d0) & (distances <= d1)
+        frac = (distances[mask] - d0) / (d1 - d0) if d1 != d0 else 0
+        elevations[mask] = e0 + (e1 - e0) * frac
+    return Profile(
+        distances=distances,
+        elevations=elevations,
+        start_x=0,
+        start_y=0,
+        end_x=1,
+        end_y=0,
+    )
+
+
+def test_canyon_symmetric_v_shape():
+    """Width, depth, and area are correct for a known symmetric V-canyon."""
+    # Drop → peak at -90 → canyon floor -200 → peak -90 → drop.
+    # Outer slopes drop 60 m so peaks have prominence > 50 m.
+    prof = _make_canyon_profile(
+        [
+            (0, 250, -150, -90),  # rise to left peak
+            (250, 1000, -90, -200),  # left wall
+            (1000, 1750, -200, -90),  # right wall
+            (1750, 2000, -90, -150),  # fall from right peak
+        ]
+    )
+    canyons = get_canyons(prof, prominence=50)
+
+    assert len(canyons) == 1
+    row = canyons.row(0, named=True)
+    assert row["shoulder_elevation"] == pytest.approx(-90.0, abs=1)
+    assert row["depth"] == pytest.approx(110.0, abs=1)
+    assert row["width"] == pytest.approx(1500, abs=5)
+    # Triangle: 0.5 * 1500 * 110 = 82 500
+    assert row["cross_sectional_area"] == pytest.approx(82_500, rel=0.01)
+
+
+def test_canyon_asymmetric_shoulders():
+    """Width and area are clipped to the lower shoulder on both sides."""
+    # Left peak at -50, right peak at -100, floor at -200.
+    # Shoulder = -100 → left wall crossing at d=500.
+    # Outer slopes drop well below peaks so prominence > 50 m for both.
+    prof = _make_canyon_profile(
+        [
+            (0, 250, -200, -50),  # rise to left peak (prominence ≥ 150)
+            (250, 1000, -50, -200),  # left wall
+            (1000, 2500, -200, -100),  # right wall
+            (2500, 3000, -100, -200),  # fall from right peak (prominence ≥ 100)
+        ]
+    )
+    canyons = get_canyons(prof, prominence=50)
+
+    assert len(canyons) == 1
+    row = canyons.row(0, named=True)
+    assert row["shoulder_elevation"] == pytest.approx(-100.0, abs=1)
+    # Left wall: -50 - 150*(d-250)/750 = -100  →  d = 500
+    assert row["width_start"] == pytest.approx(500, abs=5)
+    assert row["width_end"] == pytest.approx(2500, abs=5)
+    assert row["depth"] == pytest.approx(100.0, abs=1)
+    expected_width = 2000
+    assert row["width"] == pytest.approx(expected_width, abs=10)
+    # Two triangles: left 0.5*500*100 + right 0.5*1500*100 = 100_000
+    assert row["cross_sectional_area"] == pytest.approx(100_000, rel=0.01)
+
+
+def test_canyon_single_sided_skipped():
+    """A trough with only one bounding peak is skipped."""
+    # Monotonic descent with a trough at the end — no right peak.
+    prof = _make_canyon_profile(
+        [
+            (0, 500, -50, -80),
+            (500, 1000, -80, -200),
+        ]
+    )
+    canyons = get_canyons(prof, prominence=10)
+    assert len(canyons) == 0
 
 
 # Projected CRS tests

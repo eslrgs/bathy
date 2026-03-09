@@ -203,18 +203,32 @@ def _extract_profile_arrays(
     return elevations, distances_m
 
 
-def _find_crossing_m(
+def _interp_crossing(
     elevations: np.ndarray,
-    mask: np.ndarray,
+    distances: np.ndarray,
     target_elev: float,
-    distances_m: np.ndarray,
-    fallback: float,
-) -> float:
-    """Find where profile crosses target elevation within masked region (metres)."""
-    elevs, dists = elevations[mask], distances_m[mask]
-    if len(elevs) == 0:
-        return fallback
-    return dists[np.argmin(np.abs(elevs - target_elev))]
+) -> float | None:
+    """Find the first distance where *elevations* crosses *target_elev*.
+
+    The caller controls search direction by passing slices in the desired
+    order (e.g. reversed for searching outward from a trough to the left).
+
+    Returns ``None`` when no crossing exists.
+    """
+    diff = elevations - target_elev
+    # Treat exact zeros as positive so np.sign doesn't produce 0.
+    signs = np.sign(diff)
+    signs[signs == 0] = 1
+    change_idx = np.where(np.diff(signs))[0]
+    if len(change_idx) == 0:
+        return None
+    i = change_idx[0]
+    e0, e1 = elevations[i], elevations[i + 1]
+    denom = e1 - e0
+    if denom == 0:
+        return float(distances[i])
+    t = (target_elev - e0) / denom
+    return float(distances[i] + t * (distances[i + 1] - distances[i]))
 
 
 def _normalise_profile(
@@ -899,6 +913,12 @@ def get_canyons(
     """
     Identify canyon features in the profile.
 
+    Canyons are identified as prominent troughs bounded by peaks on both
+    sides.  The **shoulder elevation** is the lower of the two bounding
+    peaks; width, depth and cross-sectional area are all measured relative
+    to that level.  Troughs without a detected peak on each side are
+    skipped.
+
     Parameters
     ----------
     profile : Profile
@@ -936,62 +956,45 @@ def get_canyons(
     for ti in trough_idx:
         left_peaks = peak_idx[peak_idx < ti]
         right_peaks = peak_idx[peak_idx > ti]
-        li = left_peaks[-1] if len(left_peaks) else None
-        ri = right_peaks[0] if len(right_peaks) else None
+        if len(left_peaks) == 0 or len(right_peaks) == 0:
+            continue
+        li = left_peaks[-1]
+        ri = right_peaks[0]
 
-        if li is None and ri is None:
+        shoulder_elev = min(elevations[li], elevations[ri])
+
+        # Search outward from the trough on each side to find the first
+        # crossing of the shoulder elevation (reversed slice for the left).
+        width_start = _interp_crossing(
+            elevations[ti - 1 :: -1],
+            distances_m[ti - 1 :: -1],
+            shoulder_elev,
+        )
+        width_end = _interp_crossing(
+            elevations[ti + 1 :],
+            distances_m[ti + 1 :],
+            shoulder_elev,
+        )
+        if width_start is None or width_end is None:
             continue
 
-        if li is not None and ri is not None:
-            lower_elev = min(elevations[li], elevations[ri])
-        else:
-            lower_elev = elevations[li] if li is not None else elevations[ri]
-
-        if li is not None:
-            width_start = distances_m[li]
-        else:
-            mask = np.arange(len(elevations)) < ti
-            width_start = _find_crossing_m(
-                elevations, mask, lower_elev, distances_m, distances_m[0]
-            )
-
-        if ri is not None:
-            width_end = distances_m[ri]
-        else:
-            mask = np.arange(len(elevations)) > ti
-            width_end = _find_crossing_m(
-                elevations, mask, lower_elev, distances_m, distances_m[-1]
-            )
-
-        if li is not None and ri is not None:
-            if elevations[li] < elevations[ri]:
-                mask = (np.arange(len(elevations)) > ti) & (
-                    np.arange(len(elevations)) <= ri
-                )
-                width_end = _find_crossing_m(
-                    elevations, mask, lower_elev, distances_m, distances_m[ri]
-                )
-            elif elevations[ri] < elevations[li]:
-                mask = (np.arange(len(elevations)) >= li) & (
-                    np.arange(len(elevations)) < ti
-                )
-                width_start = _find_crossing_m(
-                    elevations, mask, lower_elev, distances_m, distances_m[li]
-                )
-
-        area_mask = (distances_m >= width_start) & (distances_m <= width_end)
-        depths = lower_elev - elevations[area_mask]
-        depths = np.maximum(depths, 0)
+        # Build area integral including the interpolated crossing points so
+        # the edge slivers are not lost on coarse profiles.
+        inside = (distances_m > width_start) & (distances_m < width_end)
+        d_area = np.concatenate([[width_start], distances_m[inside], [width_end]])
+        e_area = np.concatenate([[shoulder_elev], elevations[inside], [shoulder_elev]])
+        depths = np.maximum(shoulder_elev - e_area, 0)
 
         canyons.append(
             {
-                "floor_distance": distances_m[ti],
-                "floor_elevation": elevations[ti],
-                "width_start": width_start,
-                "width_end": width_end,
-                "width": width_end - width_start,
-                "depth": lower_elev - elevations[ti],
-                "cross_sectional_area": trapezoid(depths, distances_m[area_mask]),
+                "floor_distance": float(distances_m[ti]),
+                "floor_elevation": float(elevations[ti]),
+                "shoulder_elevation": float(shoulder_elev),
+                "width_start": float(width_start),
+                "width_end": float(width_end),
+                "width": float(width_end - width_start),
+                "depth": float(shoulder_elev - elevations[ti]),
+                "cross_sectional_area": float(trapezoid(depths, d_area)),
             }
         )
 
@@ -1000,6 +1003,7 @@ def get_canyons(
             schema={
                 "floor_distance": pl.Float64,
                 "floor_elevation": pl.Float64,
+                "shoulder_elevation": pl.Float64,
                 "width_start": pl.Float64,
                 "width_end": pl.Float64,
                 "width": pl.Float64,

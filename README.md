@@ -34,7 +34,7 @@ bathy.plot_profile(prof)
 
 # Canyon analysis
 canyons = bathy.get_canyons(prof, prominence=100)
-bathy.plot_canyons(prof, prominence=100)
+bathy.plot_canyons(prof, canyons)
 
 # Multiple profiles
 profiles = [
