@@ -61,7 +61,7 @@ uv pip install .
 | **Profiles** | `extract_profile`, `profile_from_coordinates`, `cross_sections`, `profiles_from_file`, `profiles_from_gdf` |
 | **Profile analysis** | `profile_stats`, `max_depth`, `gradient`, `concavity_index`, `knickpoints`, `get_canyons`, `compare_stats`, `to_gdf` |
 | **Profile plotting** | `plot_profile`, `plot_profiles`, `plot_profiles_grid`, `plot_profiles_map`, `plot_gradient`, `plot_knickpoints`, `plot_canyons` |
-| **Interactive** | `draw_profile` — draw and edit profiles on a map in Jupyter with drag, undo, delete, and insert waypoints |
+| **Draw** | `draw_profile` — draw and edit profiles on a map with drag, undo, delete, and insert waypoints (PyQt6 desktop window) |
 
 ## Preset regions
 
@@ -77,7 +77,28 @@ data = bathy.load_gebco_opendap(region="mediterranean")
 
 ## Examples
 
-See [examples/basic_usage.py](examples/basic_usage.py), [examples/profiles.py](examples/profiles.py), and [examples/interactive.ipynb](examples/interactive.ipynb).
+See [examples/basic_usage.py](examples/basic_usage.py), [examples/profiles.py](examples/profiles.py), and [examples/draw_profile.py](examples/draw_profile.py).
+
+### Profile drawing (desktop app)
+
+Draw profiles interactively in a PyQt6 window. Requires `uv pip install bathy[draw]`.
+
+```bash
+uv run bathy-draw path/to/data.nc
+```
+
+Or from Python:
+
+```python
+import bathy
+
+data = bathy.load_bathymetry("data.nc")
+profiles = bathy.draw_profile(data)
+```
+
+- Left-click to add waypoints, right-click to finish a profile, double-click to stop
+- Drag waypoints to reposition, press **z** to undo, shift-click to delete
+- Save/load profiles as GeoPackage, toggle visibility per profile
 
 ## Development
 

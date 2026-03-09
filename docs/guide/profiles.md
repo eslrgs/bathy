@@ -2,24 +2,34 @@
 
 Bathymetric profiles allow you to analyse depth variations along a transect.
 
-## Interactive drawing
+## Drawing profiles
 
-Draw and edit profiles by clicking directly on the map (requires `%matplotlib widget` in Jupyter):
+`draw_profile` opens a desktop window where you can draw and edit profiles directly on the bathymetry map. Install with `uv pip install bathy[draw]`.
+
+### From the command line
+
+```bash
+uv run bathy-draw path/to/data.nc
+```
+
+### From Python
 
 ```python
-%matplotlib widget
 import bathy
 
 data = bathy.load_gebco_opendap(lon_range=(-12, -4), lat_range=(50, 56))
-result = bathy.draw_profile(data)
-result["profiles"]  # list of drawn Profile objects
+profiles = bathy.draw_profile(data)
 ```
+
+Returns a `list[Profile]` when the window is closed.
+
+### Controls
 
 **Drawing:**
 
 - **Left-click** to add waypoints along a profile path
 - **Right-click** to finish the current profile and start a new one
-- **Double-click** to stop drawing entirely
+- **Double-click** or press **Done** to stop drawing
 
 **Editing:**
 
@@ -28,7 +38,12 @@ result["profiles"]  # list of drawn Profile objects
 - **Shift-click** on a waypoint to delete it
 - **Click on a line segment** to insert a new waypoint between two existing ones
 
-The profile plot on the right updates as you draw and edit. See the [interactive example](https://github.com/eslrgs/bathy/blob/main/examples/interactive.ipynb) for a worked example.
+**Window features:**
+
+- Pan/zoom toolbar for navigating the map
+- Coordinate readout as you move the cursor
+- Profile list with visibility checkboxes (All/None toggle)
+- Save and Load buttons for GeoPackage, Shapefile, or GeoJSON
 
 ### Saving and reloading
 
@@ -36,14 +51,14 @@ Profiles can be saved to a file and reloaded for further editing, like a GIS pro
 
 ```python
 # Save drawn profiles
-bathy.to_gdf(result["profiles"]).to_file("profiles.gpkg")
+bathy.to_gdf(profiles).to_file("profiles.gpkg")
 
 # Later: reload and continue editing
-profiles = bathy.profiles_from_file(data, "profiles.gpkg")
-result = bathy.draw_profile(data, profiles=profiles)
+reloaded = bathy.profiles_from_file(data, "profiles.gpkg")
+profiles = bathy.draw_profile(data, profiles=reloaded)
 ```
 
-Waypoint coordinates are preserved through the round-trip. You can also load profiles from any source — shapefiles, GeoDataFrames, or previous `draw_profile` sessions.
+You can also use the **Save** and **Load** buttons in the window directly.
 
 ## Creating profiles
 

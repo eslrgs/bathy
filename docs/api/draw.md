@@ -1,3 +1,3 @@
-# Interactive
+# Draw
 
 ::: bathy.draw_profile

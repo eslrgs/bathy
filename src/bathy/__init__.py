@@ -16,7 +16,6 @@ from bathy.analysis import (
     summary,
 )
 from bathy.datasets import sample_data
-from bathy.interactive import draw_profile
 from bathy.io import (
     list_regions,
     load_bathymetry,
@@ -65,6 +64,15 @@ from bathy.profile_plot import (
 )
 
 __version__ = version("bathy")
+
+
+def draw_profile(*args, **kwargs):
+    """Lazy wrapper — see :func:`bathy.draw.draw_profile`."""
+    from bathy.draw import draw_profile as _draw_profile
+
+    return _draw_profile(*args, **kwargs)
+
+
 __all__ = [
     # Datasets
     "sample_data",
