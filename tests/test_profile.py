@@ -385,14 +385,6 @@ def test_profile_stats(fake_profile):
 # Canyon detection
 
 
-def test_get_canyons_returns_dataframe(fake_data):
-    """get_canyons returns a Polars DataFrame."""
-    prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=30)
-    canyons = get_canyons(prof, prominence=10)
-
-    assert isinstance(canyons, pl.DataFrame)
-
-
 def test_canyon_dataframe_columns(fake_data):
     """DataFrame has expected columns."""
     prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=30)
@@ -423,26 +415,20 @@ def test_prominence_parameter(fake_data):
     assert len(canyons_high) <= len(canyons_low)
 
 
-def test_invalid_prominence_raises(fake_data):
-    """Negative or zero prominence raises ValueError."""
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"prominence": -10},
+        {"prominence": 0},
+        {"smooth": -1},
+        {"smooth": 0},
+    ],
+)
+def test_invalid_canyon_params_raise(fake_data, kwargs):
+    """Negative or zero prominence/smooth raises ValueError."""
     prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=30)
-
     with pytest.raises(ValueError):
-        get_canyons(prof, prominence=-10)
-
-    with pytest.raises(ValueError):
-        get_canyons(prof, prominence=0)
-
-
-def test_invalid_smooth_raises(fake_data):
-    """Negative or zero smooth raises ValueError."""
-    prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=30)
-
-    with pytest.raises(ValueError):
-        get_canyons(prof, smooth=-1)
-
-    with pytest.raises(ValueError):
-        get_canyons(prof, smooth=0)
+        get_canyons(prof, **kwargs)
 
 
 def test_canyon_measurements_in_metres(fake_data):

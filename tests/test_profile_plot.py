@@ -1,22 +1,9 @@
 """Smoke tests for profile plotting functions."""
 
-import matplotlib
+from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt  # noqa: E402
-import pytest  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
-
-import bathy  # noqa: E402
-from bathy.profile import extract_profile, knickpoints  # noqa: E402
-
-
-@pytest.fixture(autouse=True)
-def _close_figures():
-    """Close all figures after each test to free memory."""
-    yield
-    plt.close("all")
+import bathy
+from bathy.profile import extract_profile, knickpoints
 
 
 def test_plot_profile(fake_profile):

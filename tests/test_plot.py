@@ -1,24 +1,11 @@
 """Smoke tests for grid plotting functions."""
 
-import matplotlib
+import numpy as np
+import xarray as xr
+from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pytest  # noqa: E402
-import xarray as xr  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
-
-import bathy  # noqa: E402
-from bathy.plot import get_extent  # noqa: E402
-
-
-@pytest.fixture(autouse=True)
-def _close_figures():
-    """Close all figures after each test to free memory."""
-    yield
-    plt.close("all")
+import bathy
+from bathy.plot import get_extent
 
 
 def test_plot_bathy(fake_data):

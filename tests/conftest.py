@@ -3,12 +3,24 @@
 import os
 import tempfile
 
-import numpy as np
-import pytest
-import rioxarray  # noqa: F401
-import xarray as xr
+import matplotlib
 
-from bathy.profile import extract_profile
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+import rioxarray  # noqa: F401, E402
+import xarray as xr  # noqa: E402
+
+from bathy.profile import extract_profile  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _close_figures():
+    """Close all figures after each test to free memory."""
+    yield
+    plt.close("all")
 
 
 def _make_bathy(elevations, n=20):
