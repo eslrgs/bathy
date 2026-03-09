@@ -155,6 +155,27 @@ def _calculate_num_points(
     return max(2, int(np.ceil(total_distance_m / point_spacing)) + 1)
 
 
+_VALID_METHODS = {"nearest", "linear", "cubic", "quadratic", "slinear", "zero"}
+
+
+def _sample_grid(
+    data: xr.DataArray,
+    coords: dict[str, xr.DataArray | float],
+    method: str,
+) -> np.ndarray:
+    """Sample *data* at *coords* using the given interpolation method."""
+    if method == "nearest":
+        return data.sel(coords, method="nearest").values.astype(float)
+    return data.interp(coords, method=method).values.astype(float)
+
+
+def _validate_method(method: str) -> None:
+    if method not in _VALID_METHODS:
+        raise ValueError(
+            f"Unknown method {method!r}, expected one of {sorted(_VALID_METHODS)}"
+        )
+
+
 def _extract_profile_arrays(
     data: xr.DataArray,
     start_x: float,
@@ -163,6 +184,7 @@ def _extract_profile_arrays(
     end_y: float,
     n: int,
     crs: CRS | None = None,
+    method: str = "nearest",
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Extract elevation and distance arrays along a profile.
@@ -196,9 +218,7 @@ def _extract_profile_arrays(
 
     x_da = xr.DataArray(xs, dims="points")
     y_da = xr.DataArray(ys, dims="points")
-    elevations = data.sel({x_dim: x_da, y_dim: y_da}, method="nearest").values.astype(
-        float
-    )
+    elevations = _sample_grid(data, {x_dim: x_da, y_dim: y_da}, method)
 
     return elevations, distances_m
 
@@ -271,6 +291,7 @@ def extract_profile(
     point_spacing: float | None = None,
     name: str | None = None,
     metadata: dict | None = None,
+    method: str = "nearest",
 ) -> Profile:
     """
     Create a bathymetric profile between two points.
@@ -292,6 +313,12 @@ def extract_profile(
         Name for this profile
     metadata : dict, optional
         Additional metadata
+    method : str, optional
+        Interpolation method for sampling the grid: ``"nearest"`` (default),
+        ``"linear"``, ``"cubic"``, ``"quadratic"``, ``"slinear"``, or
+        ``"zero"``.  All methods except ``"nearest"`` use
+        :meth:`xarray.DataArray.interp` and may produce NaN at grid edges
+        or where the input contains NaN.
 
     Returns
     -------
@@ -304,6 +331,7 @@ def extract_profile(
     ...     data, start=(-9.5, 52.0), end=(-5.5, 52.0), point_spacing=1000.0
     ... )
     """
+    _validate_method(method)
     start_x, start_y = start
     end_x, end_y = end
     crs = get_crs(data)
@@ -315,7 +343,7 @@ def extract_profile(
         start_x, start_y, end_x, end_y, num_points, point_spacing, crs
     )
     elevations, distances = _extract_profile_arrays(
-        data, start_x, start_y, end_x, end_y, n, crs
+        data, start_x, start_y, end_x, end_y, n, crs, method=method
     )
 
     meta = dict(metadata) if metadata else {}
@@ -341,6 +369,7 @@ def profile_from_coordinates(
     point_spacing: float | None = None,
     name: str | None = None,
     metadata: dict | None = None,
+    method: str = "nearest",
 ) -> Profile:
     """
     Create a Profile from a list of (x, y) coordinates.
@@ -361,6 +390,12 @@ def profile_from_coordinates(
         Name for this profile
     metadata : dict, optional
         Additional metadata
+    method : str, optional
+        Interpolation method for sampling the grid: ``"nearest"`` (default),
+        ``"linear"``, ``"cubic"``, ``"quadratic"``, ``"slinear"``, or
+        ``"zero"``.  All methods except ``"nearest"`` use
+        :meth:`xarray.DataArray.interp` and may produce NaN at grid edges
+        or where the input contains NaN.
 
     Returns
     -------
@@ -372,6 +407,7 @@ def profile_from_coordinates(
     >>> prof = profile_from_coordinates(data, coords, name="Custom Path")
     >>> prof = profile_from_coordinates(data, coords, point_spacing=1000.0)
     """
+    _validate_method(method)
     if len(coordinates) < 2:
         raise ValueError(f"Need at least 2 coordinates, got {len(coordinates)}")
     if point_spacing is not None and point_spacing <= 0:
@@ -424,6 +460,7 @@ def profile_from_coordinates(
                 ey,
                 n,
                 crs,
+                method=method,
             )
 
             if i > 0:
@@ -442,7 +479,7 @@ def profile_from_coordinates(
         cumulative_m = 0.0
 
         for i, (cx, cy) in enumerate(coordinates):
-            elev = float(data.sel({x_dim: cx, y_dim: cy}, method="nearest").values)
+            elev = float(_sample_grid(data, {x_dim: cx, y_dim: cy}, method))
             elev_list.append(elev)
 
             if i == 0:
@@ -484,6 +521,7 @@ def cross_sections(
     section_width_m: float,
     num_points: int | None = None,
     point_spacing: float | None = None,
+    method: str = "nearest",
 ) -> list[Profile]:
     """
     Create perpendicular cross-sections along a profile at regular intervals.
@@ -502,6 +540,9 @@ def cross_sections(
         Number of points along each cross-section
     point_spacing : float, optional
         Spacing between points in metres along cross-sections
+    method : str, optional
+        Interpolation method (default ``"nearest"``).  See
+        :func:`extract_profile` for details.
 
     Returns
     -------
@@ -571,6 +612,7 @@ def cross_sections(
                     num_points=num_points,
                     point_spacing=point_spacing,
                     name=f"Section_{i + 1}_at_{dist_m:.0f}m",
+                    method=method,
                 )
             )
     else:
@@ -612,6 +654,7 @@ def cross_sections(
                     num_points=num_points,
                     point_spacing=point_spacing,
                     name=f"Section_{i + 1}_at_{dist_m:.0f}m",
+                    method=method,
                 )
             )
 
@@ -623,6 +666,7 @@ def profiles_from_file(
     path: str | Path,
     id_column: str | None = None,
     point_spacing: float | None = None,
+    method: str = "nearest",
 ) -> list[Profile]:
     """
     Create profiles from linestring features in a vector file.
@@ -641,6 +685,9 @@ def profiles_from_file(
     point_spacing : float, optional
         Spacing between sample points in metres. When provided, each segment
         is interpolated along the geodesic at this interval.
+    method : str, optional
+        Interpolation method (default ``"nearest"``).  See
+        :func:`extract_profile` for details.
 
     Returns
     -------
@@ -651,7 +698,11 @@ def profiles_from_file(
     >>> profiles = profiles_from_file(data, "canyons.gpkg", id_column="NAME")
     """
     return profiles_from_gdf(
-        data, gpd.read_file(path), id_column=id_column, point_spacing=point_spacing
+        data,
+        gpd.read_file(path),
+        id_column=id_column,
+        point_spacing=point_spacing,
+        method=method,
     )
 
 
@@ -660,6 +711,7 @@ def profiles_from_gdf(
     gdf: gpd.GeoDataFrame,
     id_column: str | None = None,
     point_spacing: float | None = None,
+    method: str = "nearest",
 ) -> list[Profile]:
     """
     Create profiles from LineString features in a GeoDataFrame.
@@ -675,6 +727,9 @@ def profiles_from_gdf(
     point_spacing : float, optional
         Spacing between sample points in metres. When provided, each segment
         is interpolated along the geodesic at this interval.
+    method : str, optional
+        Interpolation method (default ``"nearest"``).  See
+        :func:`extract_profile` for details.
 
     Returns
     -------
@@ -746,6 +801,7 @@ def profiles_from_gdf(
                     point_spacing=point_spacing,
                     name=name,
                     metadata=meta,
+                    method=method,
                 )
             )
 

@@ -36,6 +36,25 @@ def test_create_profile(fake_data):
     assert prof.end_y == 53
 
 
+def test_extract_profile_method_linear(fake_data):
+    """Linear interpolation produces non-integer values from an integer grid."""
+    linear = extract_profile(
+        fake_data, start=(-9, 52), end=(-6, 53), num_points=50, method="linear"
+    )
+    # The fixture grid is integer-valued; linear interp between cells
+    # should produce at least some fractional elevations.
+    has_fractional = np.any(linear.elevations != np.floor(linear.elevations))
+    assert has_fractional
+
+
+def test_extract_profile_method_invalid(fake_data):
+    """Invalid method raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown method"):
+        extract_profile(
+            fake_data, start=(-9, 52), end=(-6, 53), num_points=10, method="banana"
+        )
+
+
 def test_max_depth(fake_data):
     """Find the deepest point in a profile."""
     from bathy.profile import max_depth

@@ -85,7 +85,22 @@ prof = bathy.extract_profile(
     end=(10, 40),
     point_spacing=5000.0,  # 5 km spacing
 )
+
+# Use linear interpolation instead of nearest-neighbour
+prof = bathy.extract_profile(
+    data,
+    start=(-5, 36),
+    end=(10, 40),
+    point_spacing=5000.0,
+    method="linear",
+)
 ```
+
+The `method` parameter controls how elevations are sampled from the grid.
+`"nearest"` (the default) snaps to the closest cell. `"linear"` and `"cubic"`
+interpolate between cells for smoother profiles. All profile functions
+(`extract_profile`, `profile_from_coordinates`, `cross_sections`,
+`profiles_from_file`, `profiles_from_gdf`) accept this parameter.
 
 ### From shapefile or GeoDataFrame
 
