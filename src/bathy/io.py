@@ -322,6 +322,11 @@ def load_gebco_opendap(
     xr.DataArray
         Elevation data
 
+    References
+    ----------
+    GEBCO Compilation Group (2025) GEBCO 2025 Grid
+    (doi:10.5285/37c52e96-24ea-67ce-e063-7086abc05f29)
+
     Examples
     --------
     >>> data = load_gebco_opendap(lon_range=(-10, -5), lat_range=(50, 55))
