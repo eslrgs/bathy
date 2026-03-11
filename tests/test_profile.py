@@ -148,6 +148,14 @@ def test_knickpoints_with_smoothing(fake_data):
     assert set(kp.columns) == {"distance_m", "depth_m", "slope_break_deg"}
 
 
+@pytest.mark.parametrize("smooth", [-1, 0])
+def test_knickpoints_invalid_smooth(fake_data, smooth):
+    """Non-positive smooth raises ValueError."""
+    prof = extract_profile(fake_data, start=(-9, 52), end=(-6, 53), num_points=50)
+    with pytest.raises(ValueError, match="smooth must be positive"):
+        knickpoints(prof, smooth=smooth)
+
+
 # GeoDataFrame methods
 
 

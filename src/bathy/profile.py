@@ -940,6 +940,9 @@ def knickpoints(
     pl.DataFrame
         Knickpoints with columns: distance_m, depth_m, slope_break_deg
     """
+    if smooth is not None and smooth <= 0:
+        raise ValueError(f"smooth must be positive, got {smooth}")
+
     elevations = (
         gaussian_filter1d(profile.elevations, smooth) if smooth else profile.elevations
     )
@@ -1013,6 +1016,11 @@ def get_canyons(
         left_peaks = peak_idx[peak_idx < ti]
         right_peaks = peak_idx[peak_idx > ti]
         if len(left_peaks) == 0 or len(right_peaks) == 0:
+            logger.info(
+                "Skipping trough at %.0f m: missing %s bounding peak",
+                distances_m[ti],
+                "left" if len(left_peaks) == 0 else "right",
+            )
             continue
         li = left_peaks[-1]
         ri = right_peaks[0]
@@ -1032,6 +1040,10 @@ def get_canyons(
             shoulder_elev,
         )
         if width_start is None or width_end is None:
+            logger.info(
+                "Skipping trough at %.0f m: shoulder crossing not found",
+                distances_m[ti],
+            )
             continue
 
         # Build area integral including the interpolated crossing points so

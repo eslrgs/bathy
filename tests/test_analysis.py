@@ -1,6 +1,8 @@
 """Tests for analysis module."""
 
 import numpy as np
+import polars as pl
+import pytest
 import xarray as xr
 
 from bathy.analysis import (
@@ -66,11 +68,15 @@ def test_hypsometric_index_flat_surface(flat_bathy):
 
 
 def test_hypsometric_curve(fake_bathy):
-    """Hypsometric curve returns normalised, monotonic arrays."""
-    rel_area, rel_elev = hypsometric_curve(fake_bathy, bins=50)
+    """Hypsometric curve returns normalised, monotonic DataFrame."""
+    df = hypsometric_curve(fake_bathy, bins=50)
 
-    assert len(rel_area) == 50
-    assert len(rel_elev) == 50
+    assert isinstance(df, pl.DataFrame)
+    assert set(df.columns) == {"relative_area", "relative_elevation"}
+    assert len(df) == 50
+
+    rel_area = df["relative_area"].to_numpy()
+    rel_elev = df["relative_elevation"].to_numpy()
 
     assert 0 <= rel_area.min() and rel_area.max() <= 1
     assert 0 <= rel_elev.min() and rel_elev.max() <= 1
@@ -325,3 +331,39 @@ def test_slope_projected(fake_projected_data):
     slope_da = slope(fake_projected_data)
     assert slope_da.shape == fake_projected_data.shape
     assert (slope_da.values >= 0).all()
+
+
+@pytest.mark.parametrize("radius", [-1.0, 0.0])
+def test_bpi_invalid_radius(fake_bathy, radius):
+    """Non-positive radius_km raises ValueError."""
+    with pytest.raises(ValueError, match="radius_km must be positive"):
+        bpi(fake_bathy, radius_km=radius)
+
+
+@pytest.mark.parametrize("radius", [-1.0, 0.0])
+def test_rugosity_invalid_radius(fake_bathy, radius):
+    """Non-positive radius_km raises ValueError."""
+    with pytest.raises(ValueError, match="radius_km must be positive"):
+        rugosity(fake_bathy, radius_km=radius)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"lookup_km": -1.0},
+        {"lookup_km": 0.0},
+        {"flatness_threshold": -1.0},
+        {"flatness_threshold": 0.0},
+    ],
+)
+def test_geomorphons_invalid_params(fake_bathy, kwargs):
+    """Non-positive lookup_km or flatness_threshold raises ValueError."""
+    with pytest.raises(ValueError):
+        geomorphons(fake_bathy, **kwargs)
+
+
+@pytest.mark.parametrize("bins", [-1, 0])
+def test_hypsometric_curve_invalid_bins(fake_bathy, bins):
+    """Non-positive bins raises ValueError."""
+    with pytest.raises(ValueError, match="bins must be positive"):
+        hypsometric_curve(fake_bathy, bins=bins)

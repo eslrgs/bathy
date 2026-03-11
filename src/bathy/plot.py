@@ -781,8 +781,6 @@ def plot_hypsometric_curve(
     **kwargs
         Additional arguments passed to plt.plot
 
-    Examples
-    --------
     Returns
     -------
     tuple[Figure, Axes]
@@ -792,10 +790,10 @@ def plot_hypsometric_curve(
     --------
     >>> plot_hypsometric_curve(data)
     """
-    rel_area, rel_elev = hypsometric_curve(data, bins)
+    df = hypsometric_curve(data, bins)
 
     fig, ax = plt.subplots(figsize=(8, 8))
-    ax.plot(rel_area, rel_elev, linewidth=2, **kwargs)
+    ax.plot(df["relative_area"], df["relative_elevation"], linewidth=2, **kwargs)
     ax.plot([0, 1], [1, 0], "k--", alpha=0.3, label="Equidimensional")
     ax.legend()
     ax.set_xlabel("Relative Area (a/A)")

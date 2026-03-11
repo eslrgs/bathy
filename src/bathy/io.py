@@ -144,7 +144,10 @@ def _load_geotiff(
     lon_range: tuple[float, float] | None,
     lat_range: tuple[float, float] | None,
 ) -> xr.DataArray:
-    """Load GeoTIFF file with rioxarray."""
+    """Load GeoTIFF file with rioxarray.
+
+    For multi-band files, only band 1 is selected.
+    """
     import rioxarray  # noqa: PLC0415
 
     da = rioxarray.open_rasterio(filepath, masked=True)

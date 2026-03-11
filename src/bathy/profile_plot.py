@@ -55,7 +55,8 @@ def plot_profile(
 
     Returns
     -------
-    Figure, list[Axes]
+    tuple[Figure, list[Axes]]
+        Figure and list of axes (one element without map, two with map).
     """
     elevations = (
         gaussian_filter1d(profile.elevations, sigma=smooth)
@@ -138,7 +139,8 @@ def plot_knickpoints(
 
     Returns
     -------
-    Figure, list[Axes]
+    tuple[Figure, list[Axes]]
+        Figure and list of axes.
     """
     if knickpoints_df is None:
         knickpoints_df = knickpoints(profile, threshold=threshold, smooth=smooth)
@@ -173,7 +175,8 @@ def plot_gradient(profile: Profile, **kwargs) -> tuple[Figure, list[Axes]]:
 
     Returns
     -------
-    Figure, Axes
+    tuple[Figure, list[Axes]]
+        Figure and list containing the single gradient axes.
     """
     grad = gradient(profile)
 
@@ -205,7 +208,8 @@ def plot_canyons(
 
     Returns
     -------
-    Figure, list[Axes]
+    tuple[Figure, list[Axes]]
+        Figure and list of axes.
     """
 
     if len(canyons) == 0:
@@ -271,7 +275,8 @@ def plot_profiles(
 
     Returns
     -------
-    Figure, list[Axes]
+    tuple[Figure, list[Axes]]
+        Figure and list of axes (one element without map, two with map).
 
     Examples
     --------

@@ -192,9 +192,7 @@ def hypsometric_index(data: xr.DataArray) -> float:
     return float((h_mean - h_min) / (h_max - h_min))
 
 
-def hypsometric_curve(
-    data: xr.DataArray, bins: int = 100
-) -> tuple[np.ndarray, np.ndarray]:
+def hypsometric_curve(data: xr.DataArray, bins: int = 100) -> pl.DataFrame:
     """
     Calculate the hypsometric curve.
 
@@ -207,22 +205,32 @@ def hypsometric_curve(
 
     Returns
     -------
-    relative_area : np.ndarray
-        Cumulative proportion of area above each elevation (1 to 0)
-    relative_elevation : np.ndarray
-        Normalised elevation (0 = min, 1 = max)
+    pl.DataFrame
+        DataFrame with columns ``relative_area`` (cumulative proportion of
+        area above each elevation, 1 to 0) and ``relative_elevation``
+        (normalised elevation, 0 = min, 1 = max).
 
     Examples
     --------
-    >>> rel_area, rel_elev = hypsometric_curve(data)
-    >>> plt.plot(rel_area, rel_elev)
+    >>> df = hypsometric_curve(data)
+    >>> plt.plot(df["relative_area"], df["relative_elevation"])
     """
+    if bins <= 0:
+        raise ValueError(f"bins must be positive, got {bins}")
+
     values = _clean_values(data)
     if len(values) == 0:
-        return np.array([]), np.array([])
+        return pl.DataFrame(
+            schema={"relative_area": pl.Float64, "relative_elevation": pl.Float64}
+        )
     h_min, h_max = values.min(), values.max()
     if h_max == h_min:
-        return np.ones(bins), np.linspace(0, 1, bins)
+        return pl.DataFrame(
+            {
+                "relative_area": np.ones(bins),
+                "relative_elevation": np.linspace(0, 1, bins),
+            }
+        )
 
     bin_edges = np.linspace(h_min, h_max, bins + 1)
     counts, _ = np.histogram(values, bins=bin_edges)
@@ -233,7 +241,12 @@ def hypsometric_curve(
     bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2
     relative_elevation = (bin_centres - h_min) / (h_max - h_min)
 
-    return relative_area, relative_elevation
+    return pl.DataFrame(
+        {
+            "relative_area": relative_area,
+            "relative_elevation": relative_elevation,
+        }
+    )
 
 
 def slope(data: xr.DataArray) -> xr.DataArray:
@@ -299,6 +312,9 @@ def bpi(data: xr.DataArray, radius_km: float = 1.0) -> xr.DataArray:
     --------
     >>> bpi_data = bpi(data, radius_km=2.0)
     """
+    if radius_km <= 0:
+        raise ValueError(f"radius_km must be positive, got {radius_km}")
+
     from scipy.ndimage import uniform_filter  # noqa: PLC0415
 
     dy, dx = _cell_size_metres(data)
@@ -340,6 +356,9 @@ def rugosity(data: xr.DataArray, radius_km: float = 1.0) -> xr.DataArray:
     --------
     >>> rug = rugosity(data, radius_km=0.5)
     """
+    if radius_km <= 0:
+        raise ValueError(f"radius_km must be positive, got {radius_km}")
+
     from scipy.ndimage import uniform_filter  # noqa: PLC0415
 
     gy, gx, dy, dx_rows = _gradients(data)
@@ -439,6 +458,13 @@ def geomorphons(
     --------
     >>> geom = geomorphons(data, lookup_km=2.0)
     """
+    if lookup_km <= 0:
+        raise ValueError(f"lookup_km must be positive, got {lookup_km}")
+    if flatness_threshold <= 0:
+        raise ValueError(
+            f"flatness_threshold must be positive, got {flatness_threshold}"
+        )
+
     dy, dx = _cell_size_metres(data)
 
     z = data.values.astype(float)

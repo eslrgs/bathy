@@ -59,6 +59,7 @@ nav:
       - Analysis: api/analysis.md
       - Plotting: api/plot.md
       - Profile: api/profile.md
+      - Datasets: api/datasets.md
       - Draw: api/draw.md
 
 markdown_extensions:
