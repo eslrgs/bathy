@@ -1,5 +1,6 @@
 """Tests for analysis module."""
 
+import geopandas as gpd
 import numpy as np
 import polars as pl
 import pytest
@@ -9,6 +10,7 @@ from bathy.analysis import (
     _cell_size_metres,
     aspect,
     bpi,
+    contours,
     curvature,
     geomorphons,
     hypsometric_curve,
@@ -367,3 +369,46 @@ def test_hypsometric_curve_invalid_bins(fake_bathy, bins):
     """Non-positive bins raises ValueError."""
     with pytest.raises(ValueError, match="bins must be positive"):
         hypsometric_curve(fake_bathy, bins=bins)
+
+
+def test_contours_returns_geodataframe(fake_bathy):
+    """contours returns a GeoDataFrame with depth and geometry columns."""
+    gdf = contours(fake_bathy, levels=[-75, -50, -25])
+
+    assert isinstance(gdf, gpd.GeoDataFrame)
+    assert "depth" in gdf.columns
+    assert "geometry" in gdf.columns
+    assert len(gdf) > 0
+
+
+def test_contours_levels_match(fake_bathy):
+    """Returned depths should be a subset of the requested levels."""
+    levels = [-80, -60, -40, -20]
+    gdf = contours(fake_bathy, levels=levels)
+
+    assert set(gdf["depth"].unique()).issubset(set(levels))
+
+
+def test_contours_with_interval(fake_bathy):
+    """contours with interval produces regularly spaced levels."""
+    gdf = contours(fake_bathy, interval=25)
+
+    assert isinstance(gdf, gpd.GeoDataFrame)
+    assert len(gdf) > 0
+    depths = sorted(gdf["depth"].unique())
+    if len(depths) > 1:
+        spacings = np.diff(depths)
+        assert np.allclose(spacings, 25)
+
+
+def test_contours_invalid_interval(fake_bathy):
+    """Non-positive interval raises ValueError."""
+    with pytest.raises(ValueError, match="interval must be positive"):
+        contours(fake_bathy, interval=-10)
+
+
+def test_contours_flat_surface(flat_bathy):
+    """Flat surface produces no contour lines."""
+    gdf = contours(flat_bathy, levels=[-400, -300])
+
+    assert len(gdf) == 0

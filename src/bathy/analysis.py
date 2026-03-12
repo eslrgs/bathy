@@ -1,9 +1,14 @@
 """Bathymetry analysis functions."""
 
+import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import xarray as xr
 from geographiclib.geodesic import Geodesic
+from shapely.geometry import LineString
+
+from bathy.utils import get_crs, get_dim_names, is_projected
 
 _GEOMORPHON_LABELS = [
     "Flat",
@@ -42,7 +47,6 @@ def _cell_size_metres(data: xr.DataArray) -> tuple[float, float]:
     For projected CRS the coordinate spacing is already in metres.
     For geographic CRS a geodesic measurement on WGS84 is used.
     """
-    from bathy.utils import get_dim_names, is_projected  # noqa: PLC0415
 
     x_dim, y_dim = get_dim_names(data)
 
@@ -84,7 +88,6 @@ def _gradients(
     to account for convergence of meridians.  For projected CRS, cell
     sizes are uniform.
     """
-    from bathy.utils import get_dim_names, is_projected  # noqa: PLC0415
 
     x_dim, y_dim = get_dim_names(data)
     z = data.values.astype(float)
@@ -527,3 +530,73 @@ def geomorphons(
     geom[(p > m) & (m > 0) & ((p - m) < 3)] = 7
 
     return xr.DataArray(geom, coords=data.coords, dims=data.dims, name="geomorphons")
+
+
+def contours(
+    data: xr.DataArray,
+    levels: np.ndarray | list[float] | None = None,
+    interval: float | None = None,
+) -> gpd.GeoDataFrame:
+    """
+    Extract depth contour lines as vector geometries.
+
+    Provide *levels* for explicit contour values, *interval* for regular
+    spacing, or neither to let matplotlib choose automatically.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Elevation data.
+    levels : array-like, optional
+        Explicit contour elevations (e.g. ``[-100, -200, -500]``).
+    interval : float, optional
+        Regular contour spacing in metres.  Ignored when *levels* is given.
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        Columns ``depth`` and ``geometry`` (LineString).
+
+    Raises
+    ------
+    ValueError
+        If *interval* is not positive.
+
+    Examples
+    --------
+    >>> gdf = contours(data, interval=200)
+    """
+    if interval is not None and interval <= 0:
+        raise ValueError(f"interval must be positive, got {interval}")
+
+    x_dim, y_dim = get_dim_names(data)
+    x = data[x_dim].values
+    y = data[y_dim].values
+    z = data.values.astype(float)
+
+    if levels is not None:
+        levels = np.sort(levels)
+    elif interval is not None:
+        values = z[~np.isnan(z)]
+        lo = np.floor(values.min() / interval) * interval
+        hi = np.ceil(values.max() / interval) * interval
+        levels = np.arange(lo, hi + interval / 2, interval)
+
+    fig, ax = plt.subplots()
+    try:
+        cs = (
+            ax.contour(x, y, z)
+            if levels is None
+            else ax.contour(x, y, z, levels=levels)
+        )
+        rows: list[dict] = []
+        for level_value, segments in zip(cs.levels, cs.allsegs, strict=False):
+            for seg in segments:
+                if len(seg) >= 2:
+                    rows.append(
+                        {"depth": float(level_value), "geometry": LineString(seg)}
+                    )
+    finally:
+        plt.close(fig)
+
+    return gpd.GeoDataFrame(rows, crs=get_crs(data))

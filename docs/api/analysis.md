@@ -17,3 +17,4 @@
 ::: bathy.bpi
 ::: bathy.rugosity
 ::: bathy.geomorphons
+::: bathy.contours

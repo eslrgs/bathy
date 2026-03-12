@@ -94,6 +94,21 @@ bathy.plot_profile(prof)
 bathy.stats(prof)
 ```
 
+## Contour extraction
+
+Extract depth contours as vector geometries for export or spatial analysis:
+
+```python
+# Contours at specific depths
+gdf = bathy.contours(data, levels=[-200, -1000, -2000])
+
+# Regular interval
+gdf = bathy.contours(data, interval=500)
+
+# Export to file
+gdf.to_file("contours.gpkg")
+```
+
 ## Summary statistics
 
 ```python

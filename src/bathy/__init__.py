@@ -7,6 +7,7 @@ from bathy import profile
 from bathy.analysis import (
     aspect,
     bpi,
+    contours,
     curvature,
     geomorphons,
     hypsometric_curve,
@@ -91,6 +92,7 @@ __all__ = [
     "rugosity",
     "aspect",
     "geomorphons",
+    "contours",
     # Plotting
     "plot_bathy",
     "plot_hillshade",
