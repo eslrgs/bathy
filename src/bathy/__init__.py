@@ -14,6 +14,7 @@ from bathy.analysis import (
     hypsometric_index,
     rugosity,
     slope,
+    smooth,
     summary,
 )
 from bathy.datasets import sample_data
@@ -95,6 +96,7 @@ __all__ = [
     "aspect",
     "geomorphons",
     "contours",
+    "smooth",
     # Plotting
     "plot_bathy",
     "plot_hillshade",

@@ -18,3 +18,4 @@
 ::: bathy.rugosity
 ::: bathy.geomorphons
 ::: bathy.contours
+::: bathy.smooth

@@ -91,7 +91,18 @@ prof = bathy.extract_profile(
 bathy.plot_profile(prof)
 
 # Get statistics
-bathy.stats(prof)
+bathy.profile_stats(prof)
+```
+
+## Smoothing
+
+Gaussian smooth a grid to suppress noise before derived analysis:
+
+```python
+smoothed = bathy.smooth(data, sigma_km=2.0)
+
+# Chain with other analysis
+bathy.plot_slope(smoothed)
 ```
 
 ## Contour extraction

@@ -600,3 +600,52 @@ def contours(
         plt.close(fig)
 
     return gpd.GeoDataFrame(rows, crs=get_crs(data))
+
+
+def smooth(
+    data: xr.DataArray,
+    sigma_km: float = 1.0,
+) -> xr.DataArray:
+    """
+    Gaussian smooth a bathymetry grid.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Elevation data.
+    sigma_km : float, default 1.0
+        Gaussian kernel standard deviation in kilometres.
+
+    Returns
+    -------
+    xr.DataArray
+        Smoothed elevation grid (NaNs propagated).
+
+    Examples
+    --------
+    >>> smoothed = smooth(data, sigma_km=2.0)
+    """
+    if sigma_km <= 0:
+        raise ValueError(f"sigma_km must be positive, got {sigma_km}")
+
+    from scipy.ndimage import gaussian_filter  # noqa: PLC0415
+
+    dy, dx = _cell_size_metres(data)
+    cell_size = (dy + dx) / 2
+    sigma_pixels = sigma_km * 1000 / cell_size
+
+    values = data.values.astype(float)
+    mask = np.isnan(values)
+
+    # Normalised convolution: smooth ignoring NaNs, then restore the mask
+    filled = np.where(mask, 0.0, values)
+    weights = np.where(mask, 0.0, 1.0)
+
+    smoothed = gaussian_filter(filled, sigma=sigma_pixels, mode="nearest")
+    weight_sum = gaussian_filter(weights, sigma=sigma_pixels, mode="nearest")
+
+    with np.errstate(invalid="ignore"):
+        result = np.where(weight_sum > 0, smoothed / weight_sum, np.nan)
+    result[mask] = np.nan
+
+    return xr.DataArray(result, coords=data.coords, dims=data.dims, name="elevation")

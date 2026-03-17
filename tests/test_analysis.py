@@ -17,6 +17,7 @@ from bathy.analysis import (
     hypsometric_index,
     rugosity,
     slope,
+    smooth,
     summary,
 )
 
@@ -412,3 +413,45 @@ def test_contours_flat_surface(flat_bathy):
     gdf = contours(flat_bathy, levels=[-400, -300])
 
     assert len(gdf) == 0
+
+
+# Smooth tests
+
+
+def test_smooth_shape_and_coords(fake_bathy):
+    """Smoothed grid preserves shape and coordinates."""
+    result = smooth(fake_bathy, sigma_km=1.0)
+
+    assert result.shape == fake_bathy.shape
+    assert list(result.dims) == list(fake_bathy.dims)
+
+
+def test_smooth_reduces_variance(fake_bathy):
+    """Smoothing should reduce variance."""
+    result = smooth(fake_bathy, sigma_km=5.0)
+
+    assert np.nanvar(result.values) < np.nanvar(fake_bathy.values)
+
+
+def test_smooth_flat_surface_unchanged(flat_bathy):
+    """Smoothing a flat surface should leave it unchanged."""
+    result = smooth(flat_bathy, sigma_km=1.0)
+
+    assert np.allclose(result.values, flat_bathy.values)
+
+
+def test_smooth_propagates_nans(fake_bathy):
+    """NaN cells in the input should remain NaN in the output."""
+    data = fake_bathy.copy()
+    data.values[5, 5] = np.nan
+
+    result = smooth(data, sigma_km=1.0)
+
+    assert np.isnan(result.values[5, 5])
+
+
+@pytest.mark.parametrize("sigma", [-1.0, 0.0])
+def test_smooth_invalid_sigma(fake_bathy, sigma):
+    """Non-positive sigma_km raises ValueError."""
+    with pytest.raises(ValueError, match="sigma_km must be positive"):
+        smooth(fake_bathy, sigma_km=sigma)
