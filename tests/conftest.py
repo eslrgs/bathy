@@ -101,3 +101,16 @@ def temp_netcdf(fake_bathy):
         path = tmp.name
     yield path
     os.unlink(path)
+
+
+@pytest.fixture
+def temp_geotiff(fake_bathy):
+    """Temporary GeoTIFF file for testing file loading."""
+    da = fake_bathy.rename({"lon": "x", "lat": "y"})
+    da = da.rio.write_crs("EPSG:4326")
+    da = da.rio.set_spatial_dims(x_dim="x", y_dim="y")
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
+        da.rio.to_raster(tmp.name)
+        path = tmp.name
+    yield path
+    os.unlink(path)

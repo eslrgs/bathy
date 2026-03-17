@@ -32,6 +32,7 @@ dependencies = [
     "polars>=1.0.0",
     "tqdm>=4.66.0",
     "pooch>=1.7.0",
+    "owslib>=0.31.0",
 ]
 
 [project.urls]

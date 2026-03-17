@@ -37,6 +37,29 @@ print(regions[:10])
 data = bathy.load_gebco_opendap(region="mediterranean")
 ```
 
+## EMODnet Bathymetry (European seas)
+
+EMODnet provides high-resolution (~115 m) gridded bathymetry for European maritime areas via a Web Coverage Service (WCS):
+
+```python
+import bathy
+
+data = bathy.load_emodnet_wcs(
+    lon_range=(-10, -5),
+    lat_range=(50, 55),
+    save_path="data/emodnet_region.tif",  # Optional: cache locally
+)
+```
+
+This returns a GeoTIFF-backed `xr.DataArray` with `lon`/`lat` coordinates. The same preset regions and caching behaviour as GEBCO apply:
+
+```python
+data = bathy.load_emodnet_wcs(region="north_sea")
+```
+
+!!! note
+    EMODnet coverage is limited to European seas. Requests outside this area will return an error.
+
 ## Local NetCDF files
 
 Load from local NetCDF files (e.g., downloaded GEBCO data):

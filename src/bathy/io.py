@@ -85,6 +85,31 @@ def _get_region(name: str) -> tuple[float, float, float, float]:
     return REGIONS[name]
 
 
+def _resolve_region(
+    lon_range: tuple[float, float] | None,
+    lat_range: tuple[float, float] | None,
+    region: str | None,
+    *,
+    require_bounds: bool = False,
+) -> tuple[tuple[float, float] | None, tuple[float, float] | None]:
+    """Resolve region preset to lon/lat ranges, with validation."""
+    if region is not None:
+        if lon_range is not None or lat_range is not None:
+            raise ValueError(
+                "Cannot specify both 'region' and 'lon_range'/'lat_range'."
+            )
+        lon_min, lon_max, lat_min, lat_max = _get_region(region)
+        lon_range = (lon_min, lon_max)
+        lat_range = (lat_min, lat_max)
+
+    if require_bounds and (lon_range is None or lat_range is None):
+        raise ValueError(
+            "Must specify either 'region' or both 'lon_range' and 'lat_range'"
+        )
+
+    return lon_range, lat_range
+
+
 # ============================================================================
 # Internal helpers
 # ============================================================================
@@ -130,7 +155,72 @@ def _download_gebco(
                 f.write(chunk)
                 pbar.update(len(chunk))
     except Exception:
-        if os.path.exists(filepath):
+        if os.path.exists(filepath) and save_path is None:
+            os.unlink(filepath)
+        raise
+
+    logger.info(f"Saved to {filepath}")
+
+    return filepath
+
+
+_EMODNET_WCS_URL = "https://ows.emodnet-bathymetry.eu/wcs"
+_EMODNET_COVERAGE = "emodnet:mean"
+
+
+def _download_emodnet(
+    lon_range: tuple[float, float],
+    lat_range: tuple[float, float],
+    save_path: str | None,
+) -> str:
+    """Download EMODnet bathymetry data via OWSLib WCS."""
+    from owslib.wcs import WebCoverageService  # noqa: PLC0415
+
+    lon_min, lon_max = min(lon_range), max(lon_range)
+    lat_min, lat_max = min(lat_range), max(lat_range)
+
+    if save_path is None:
+        fd, filepath = tempfile.mkstemp(suffix=".tif")
+        os.close(fd)
+    else:
+        filepath = save_path
+
+    logger.info("Downloading EMODnet bathymetry data...")
+
+    try:
+        wcs = WebCoverageService(_EMODNET_WCS_URL, version="1.0.0", timeout=120)
+
+        response = wcs.getCoverage(
+            identifier=_EMODNET_COVERAGE,
+            bbox=(lon_min, lat_min, lon_max, lat_max),
+            crs="EPSG:4326",
+            format="image/tiff",
+            resx=0.00208333,
+            resy=0.00208333,
+        )
+
+        data = response.read()
+
+        if len(data) == 0:
+            raise ValueError(
+                "EMODnet WCS returned empty response. "
+                "Check that your region overlaps European seas."
+            )
+
+        # WCS may return XML error instead of TIFF
+        if data[:5] != b"II\x2a\x00\x08" and data[:4] != b"MM\x00\x2a":
+            body = data.decode("utf-8", errors="replace")[:500]
+            raise ValueError(
+                f"EMODnet WCS returned an error. "
+                f"Check that your region overlaps European seas. "
+                f"Response: {body}"
+            )
+
+        with open(filepath, "wb") as f:
+            f.write(data)
+
+    except Exception:
+        if os.path.exists(filepath) and save_path is None:
             os.unlink(filepath)
         raise
 
@@ -171,6 +261,11 @@ def _load_geotiff(
     if lat_range is not None:
         lo, hi = min(lat_range), max(lat_range)
         da = da.where((da[y_dim] >= lo) & (da[y_dim] <= hi), drop=True)
+
+    # Ensure ascending coordinate order for consistent slicing
+    for dim in (x_dim, y_dim):
+        if da[dim].size > 1 and float(da[dim][0]) > float(da[dim][-1]):
+            da = da.sortby(dim)
 
     return da
 
@@ -273,14 +368,7 @@ def load_bathymetry(
     >>> data = load_bathymetry('gebco.nc', lon_range=(-10, -5), lat_range=(50, 55))
     >>> data = load_bathymetry('gebco.nc', region='mediterranean')
     """
-    if region is not None:
-        if lon_range is not None or lat_range is not None:
-            raise ValueError(
-                "Cannot specify both 'region' and 'lon_range'/'lat_range'."
-            )
-        lon_min, lon_max, lat_min, lat_max = _get_region(region)
-        lon_range = (lon_min, lon_max)
-        lat_range = (lat_min, lat_max)
+    lon_range, lat_range = _resolve_region(lon_range, lat_range, region)
 
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -332,25 +420,68 @@ def load_gebco_opendap(
     >>> data = load_gebco_opendap(lon_range=(-10, -5), lat_range=(50, 55))
     >>> data = load_gebco_opendap(region='mediterranean')
     """
-    if region is not None:
-        if lon_range is not None or lat_range is not None:
-            raise ValueError(
-                "Cannot specify both 'region' and 'lon_range'/'lat_range'."
-            )
-        lon_min, lon_max, lat_min, lat_max = _get_region(region)
-        lon_range = (lon_min, lon_max)
-        lat_range = (lat_min, lat_max)
-
-    if lon_range is None or lat_range is None:
-        raise ValueError(
-            "Must specify either 'region' or both 'lon_range' and 'lat_range'"
-        )
+    lon_range, lat_range = _resolve_region(
+        lon_range, lat_range, region, require_bounds=True
+    )
 
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")
         filepath = save_path
     else:
         filepath = _download_gebco(lon_range, lat_range, year, save_path)
+
+    return load_bathymetry(filepath)
+
+
+def load_emodnet_wcs(
+    lon_range: tuple[float, float] | None = None,
+    lat_range: tuple[float, float] | None = None,
+    region: str | None = None,
+    save_path: str | None = None,
+) -> xr.DataArray:
+    """
+    Download bathymetry from the EMODnet Web Coverage Service.
+
+    EMODnet provides high-resolution (~115 m) gridded bathymetry for
+    European seas. Coverage is limited to European maritime areas.
+
+    Parameters
+    ----------
+    lon_range : tuple[float, float], optional
+        Longitude bounds (min, max). Cannot be used with 'region'.
+    lat_range : tuple[float, float], optional
+        Latitude bounds (min, max). Cannot be used with 'region'.
+    region : str, optional
+        Preset region name. See `bathy.list_regions()`.
+        Cannot be used with 'lon_range' or 'lat_range'.
+    save_path : str, optional
+        If provided, save the downloaded GeoTIFF to this path.
+        If the file already exists, it is loaded without downloading.
+
+    Returns
+    -------
+    xr.DataArray
+        Elevation data with 'lon' and 'lat' coordinates
+
+    References
+    ----------
+    EMODnet Bathymetry Consortium (2024). EMODnet Digital Bathymetry (DTM).
+    https://emodnet.ec.europa.eu/en/bathymetry
+
+    Examples
+    --------
+    >>> data = load_emodnet_wcs(lon_range=(-10, -5), lat_range=(50, 55))
+    >>> data = load_emodnet_wcs(region='north_sea')
+    """
+    lon_range, lat_range = _resolve_region(
+        lon_range, lat_range, region, require_bounds=True
+    )
+
+    if save_path and os.path.exists(save_path):
+        logger.info(f"Using existing file: {save_path}")
+        filepath = save_path
+    else:
+        filepath = _download_emodnet(lon_range, lat_range, save_path)
 
     return load_bathymetry(filepath)
 

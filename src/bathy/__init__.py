@@ -20,6 +20,7 @@ from bathy.datasets import sample_data
 from bathy.io import (
     list_regions,
     load_bathymetry,
+    load_emodnet_wcs,
     load_gebco_opendap,
     to_geotiff,
 )
@@ -80,6 +81,7 @@ __all__ = [
     # IO
     "list_regions",
     "load_bathymetry",
+    "load_emodnet_wcs",
     "load_gebco_opendap",
     "to_geotiff",
     # Analysis

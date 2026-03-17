@@ -7,6 +7,7 @@
 ## Loading
 
 ::: bathy.load_bathymetry
+::: bathy.load_emodnet_wcs
 ::: bathy.load_gebco_opendap
 
 ## Exporting
