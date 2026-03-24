@@ -120,6 +120,21 @@ gdf = bathy.contours(data, interval=500)
 gdf.to_file("contours.gpkg")
 ```
 
+## Interactive map
+
+Explore bathymetry on an interactive Leaflet basemap with toggleable analysis overlays:
+
+```python
+# Basic interactive map
+bathy.plot_interactive(data)
+
+# With analysis overlays
+bathy.plot_interactive(data, overlays={
+    "Slope": bathy.slope(data),
+    "Rugosity": bathy.rugosity(data),
+})
+```
+
 ## Summary statistics
 
 ```python

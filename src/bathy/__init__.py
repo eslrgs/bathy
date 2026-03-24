@@ -35,6 +35,7 @@ from bathy.plot import (
     plot_hillshade,
     plot_histogram,
     plot_hypsometric_curve,
+    plot_interactive,
     plot_overview,
     plot_rugosity,
     plot_slope,
@@ -134,6 +135,7 @@ __all__ = [
     "plot_gradient",
     "plot_canyons",
     # Interactive
+    "plot_interactive",
     "draw_profile",
     # Submodule
     "profile",

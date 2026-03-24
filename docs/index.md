@@ -10,7 +10,7 @@ bathy provides tools for loading, analysing, and visualising bathymetric (ocean 
 - **Profile analysis**: Extract and analyse bathymetric profiles with canyon detection and knickpoint identification
 - **Interactive drawing**: Draw and edit profiles on a map with drag, undo, delete, and insert
 - **Bathymetric analysis**: Calculate slope, curvature, BPI, rugosity, hypsometric indices, contour extraction, and Gaussian smoothing
-- **Visualisation**: Publication-ready plots including hillshade, depth zones, and 3D surfaces
+- **Visualisation**: Publication-ready plots including hillshade, depth zones, 3D surfaces, and interactive Leaflet maps
 
 ## Quick example
 

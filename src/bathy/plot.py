@@ -803,3 +803,161 @@ def plot_hypsometric_curve(
     ax.set_aspect("equal")
     ax.grid(True, alpha=0.3)
     return fig, ax
+
+
+def _overlay_defaults(name: str, values: np.ndarray) -> tuple:
+    """Return (cmap, label, vmin, vmax) matching the static plot functions."""
+    key = name.lower()
+    if key == "slope":
+        return ("Greys", "Slope (°)", 0.0, float(np.nanpercentile(values, 99)))
+    if key == "aspect":
+        return (cmo.phase, "Aspect (°)", 0.0, 360.0)
+    if key == "curvature":
+        absmax = float(np.nanmax(np.abs(values)))
+        return (cmo.balance, "Curvature", -absmax, absmax)
+    if key == "bpi":
+        absmax = float(np.nanmax(np.abs(values)))
+        return (cmo.balance, "BPI (m)", -absmax, absmax)
+    if key == "rugosity":
+        return (cmo.amp, "Rugosity", 0.0, float(np.nanpercentile(values, 99)))
+    if key == "hillshade":
+        return ("gray", "Hillshade", 0.0, 1.0)
+    # Fallback for unknown layers
+    return ("viridis", name, float(np.nanmin(values)), float(np.nanmax(values)))
+
+
+def _render_overlay(
+    values: np.ndarray,
+    bounds: list[list[float]],
+    name: str,
+    cmap,
+    label: str,
+    vmin: float,
+    vmax: float,
+    opacity: float,
+    m,
+) -> None:
+    """Render a single DataArray as a folium ImageOverlay with legend."""
+    import branca.colormap as bcm  # noqa: PLC0415
+    import folium  # noqa: PLC0415
+
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    rgba = cmap(norm(values))
+
+    nan_mask = np.isnan(values)
+    rgba[nan_mask] = [0, 0, 0, 0]
+    rgba[~nan_mask, 3] = opacity
+    img = (rgba * 255).astype(np.uint8)
+
+    folium.raster_layers.ImageOverlay(
+        image=img,
+        bounds=bounds,
+        origin="lower",
+        mercator_project=True,
+        name=name,
+    ).add_to(m)
+
+    tick_values = np.linspace(vmin, vmax, 8)
+    colors = [
+        "#{:02x}{:02x}{:02x}".format(*[int(c * 255) for c in cmap(norm(v))[:3]])
+        for v in tick_values
+    ]
+    bcm.LinearColormap(colors=colors, vmin=vmin, vmax=vmax, caption=label).add_to(m)
+
+
+def plot_interactive(
+    data: xr.DataArray,
+    overlays: dict[str, xr.DataArray] | None = None,
+    cmap=None,
+    opacity: float = 0.7,
+    mask_land: bool = True,
+    tiles: str = "CartoDB positron",
+):
+    """
+    Display bathymetry on an interactive Leaflet map.
+
+    Uses ``folium`` to render an interactive map overlay. Additional
+    analysis layers (slope, aspect, etc.) can be added via *overlays*
+    and toggled with the layer control.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Elevation data.
+    overlays : dict[str, xr.DataArray], optional
+        Extra layers to display, e.g. ``{"Slope": bathy.slope(data)}``.
+        Each is rendered as a toggleable overlay with an auto-detected
+        colormap and legend.
+    cmap : str or Colormap, optional
+        Colormap for the bathymetry layer. Defaults to cmocean 'deep_r'.
+    opacity : float, default 0.7
+        Overlay opacity for valid (ocean) pixels.
+    mask_land : bool, default True
+        If True, mask positive elevations as transparent.
+    tiles : str, default 'CartoDB positron'
+        Base tile layer name.
+
+    Returns
+    -------
+    folium.Map
+        Interactive map. Renders in Jupyter; call ``.save("map.html")``
+        to export.
+
+    Examples
+    --------
+    >>> m = bathy.plot_interactive(data)
+    >>> m = bathy.plot_interactive(data, overlays={"Slope": bathy.slope(data)})
+    >>> m.save("my_map.html")
+    """
+    import folium  # noqa: PLC0415
+
+    if cmap is None:
+        cmap = cmo.deep_r
+    elif isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+
+    x_dim, y_dim = get_dim_names(data)
+
+    values = data.values.astype(float)
+    if mask_land:
+        values = np.where(values >= 0, np.nan, values)
+
+    bounds = [
+        [float(data[y_dim].min()), float(data[x_dim].min())],
+        [float(data[y_dim].max()), float(data[x_dim].max())],
+    ]
+
+    m = folium.Map(
+        location=[(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2],
+        tiles=tiles,
+    )
+
+    vmin = float(np.nanmin(values))
+    vmax = float(np.nanmax(values))
+    _render_overlay(
+        values, bounds, "Bathymetry", cmap, "Elevation (m)", vmin, vmax, opacity, m
+    )
+
+    if overlays:
+        for name, layer in overlays.items():
+            layer_values = layer.values.astype(float)
+            layer_cmap, label, lv_min, lv_max = _overlay_defaults(name, layer_values)
+            _render_overlay(
+                layer_values,
+                bounds,
+                name,
+                layer_cmap,
+                label,
+                lv_min,
+                lv_max,
+                opacity,
+                m,
+            )
+
+    folium.LayerControl().add_to(m)
+    m.fit_bounds(bounds)
+
+    return m

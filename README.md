@@ -57,7 +57,7 @@ uv pip install .
 |---|---|
 | **IO** | `load_bathymetry`, `load_gebco_opendap`, `load_emodnet_wcs`, `to_geotiff`, `list_regions` |
 | **Bathymetric analysis** | `slope`, `aspect`, `curvature`, `rugosity`, `bpi`, `geomorphons`, `contours`, `smooth`, `hypsometric_index`, `hypsometric_curve`, `summary` |
-| **Grid plotting** | `plot_bathy`, `plot_hillshade`, `plot_slope`, `plot_aspect`, `plot_curvature`, `plot_bpi`, `plot_rugosity`, `plot_geomorphons`, `plot_overview`, `plot_depth_zones`, `plot_histogram`, `plot_surface3d`, `plot_hypsometric_curve` |
+| **Grid plotting** | `plot_bathy`, `plot_hillshade`, `plot_slope`, `plot_aspect`, `plot_curvature`, `plot_bpi`, `plot_rugosity`, `plot_geomorphons`, `plot_overview`, `plot_depth_zones`, `plot_histogram`, `plot_surface3d`, `plot_hypsometric_curve`, `plot_interactive` |
 | **Profiles** | `extract_profile`, `profile_from_coordinates`, `cross_sections`, `profiles_from_file`, `profiles_from_gdf` |
 | **Profile analysis** | `profile_stats`, `max_depth`, `gradient`, `concavity_index`, `knickpoints`, `get_canyons`, `compare_stats`, `to_gdf` |
 | **Profile plotting** | `plot_profile`, `plot_profiles`, `plot_profiles_grid`, `plot_profiles_map`, `plot_gradient`, `plot_knickpoints`, `plot_canyons` |
@@ -77,7 +77,7 @@ data = bathy.load_gebco_opendap(region="mediterranean")
 
 ## Examples
 
-See [examples/basic_usage.py](examples/basic_usage.py), [examples/profiles.py](examples/profiles.py), and [examples/draw_profile.py](examples/draw_profile.py).
+See [examples/basic_usage.ipynb](examples/basic_usage.ipynb), [examples/profiles.ipynb](examples/profiles.ipynb), and [examples/draw_profile.py](examples/draw_profile.py).
 
 ### Profile drawing (desktop app)
 

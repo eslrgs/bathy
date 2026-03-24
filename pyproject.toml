@@ -33,6 +33,7 @@ dependencies = [
     "tqdm>=4.66.0",
     "pooch>=1.7.0",
     "owslib>=0.31.0",
+    "folium>=0.17.0",
 ]
 
 [project.urls]

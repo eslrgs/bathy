@@ -18,6 +18,10 @@
 ::: bathy.plot_histogram
 ::: bathy.plot_hypsometric_curve
 
+## Interactive
+
+::: bathy.plot_interactive
+
 ## 3D
 
 ::: bathy.plot_surface3d
