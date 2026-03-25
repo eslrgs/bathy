@@ -6,3 +6,8 @@ repos:
         entry: just format
         language: system
         pass_filenames: false
+      - id: just-typecheck
+        name: just typecheck
+        entry: just typecheck
+        language: system
+        pass_filenames: false

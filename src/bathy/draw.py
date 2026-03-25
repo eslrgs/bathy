@@ -44,8 +44,8 @@ class _ProfileState:
     """Mutable state for one profile on the map."""
 
     coords: list[tuple[float, float]] = field(default_factory=list)
-    line_artist: Line2D | None = None
-    marker_artist: Line2D | None = None
+    line_artist: Line2D = field(default_factory=lambda: Line2D([], []))
+    marker_artist: Line2D = field(default_factory=lambda: Line2D([], []))
     color: str = ""
     finished: bool = False
     visible: bool = True
@@ -100,7 +100,7 @@ class _ProfileDrawingLogic:
         fig.canvas.mpl_connect("key_press_event", self._on_key)
 
         # prevent gc: mpl_connect stores weak references
-        fig._profile_drawing = self  # type: ignore[attr-defined]
+        fig._profile_drawing = self  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]
 
     # -- profile management ------------------------------------------------
 
@@ -457,9 +457,14 @@ def draw_profile(
         from matplotlib.backends.backend_qtagg import (
             NavigationToolbar2QT as NavigationToolbar,
         )
-        from PyQt6.QtCore import QEventLoop, Qt
-        from PyQt6.QtGui import QFont, QIcon, QPainter, QPixmap
-        from PyQt6.QtWidgets import (
+        from PyQt6.QtCore import QEventLoop, Qt  # ty: ignore[unresolved-import]
+        from PyQt6.QtGui import (  # ty: ignore[unresolved-import]
+            QFont,
+            QIcon,
+            QPainter,
+            QPixmap,
+        )
+        from PyQt6.QtWidgets import (  # ty: ignore[unresolved-import]
             QApplication,
             QFileDialog,
             QHBoxLayout,

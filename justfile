@@ -22,3 +22,7 @@ build:
 # Show README
 readme:
     uvx grip README.md
+
+# Type check
+typecheck:
+    uvx ty check .

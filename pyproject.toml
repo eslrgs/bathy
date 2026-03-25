@@ -72,6 +72,9 @@ build-backend = "uv_build"
 source-exclude = ["tests/", "examples/", "docs/", "data/", "site/", "**/.DS_Store"]
 wheel-exclude = ["**/.DS_Store"]
 
+[tool.ty.environment]
+extra-paths = ["typings"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"

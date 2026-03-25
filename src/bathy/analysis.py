@@ -1,5 +1,9 @@
 """Bathymetry analysis functions."""
 
+from __future__ import annotations
+
+from collections.abc import Sequence
+
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -534,7 +538,7 @@ def geomorphons(
 
 def contours(
     data: xr.DataArray,
-    levels: np.ndarray | list[float] | None = None,
+    levels: np.ndarray | Sequence[float] | None = None,
     interval: float | None = None,
 ) -> gpd.GeoDataFrame:
     """

@@ -240,7 +240,7 @@ def _load_geotiff(
     """
     import rioxarray  # noqa: PLC0415
 
-    da = rioxarray.open_rasterio(filepath, masked=True)
+    da: xr.DataArray = rioxarray.open_rasterio(filepath, masked=True)  # ty: ignore[invalid-assignment]
 
     if "band" in da.dims:
         da = da.sel(band=1)
@@ -271,7 +271,7 @@ def _load_geotiff(
 
 
 def _load_netcdf(
-    filepath: str,
+    filepath: str | Path,
     lon_range: tuple[float, float] | None,
     lat_range: tuple[float, float] | None,
     var_name: str,
@@ -424,6 +424,8 @@ def load_gebco_opendap(
         lon_range, lat_range, region, require_bounds=True
     )
 
+    assert lon_range is not None and lat_range is not None
+
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")
         filepath = save_path
@@ -476,6 +478,8 @@ def load_emodnet_wcs(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
+
+    assert lon_range is not None and lat_range is not None
 
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")

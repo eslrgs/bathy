@@ -23,7 +23,7 @@ from bathy.analysis import (
 from bathy.utils import axis_labels, get_dim_names, is_projected
 
 
-def get_extent(data: xr.DataArray) -> list[float]:
+def get_extent(data: xr.DataArray) -> tuple[float, float, float, float]:
     """
     Get extent for matplotlib imshow.
 
@@ -34,16 +34,16 @@ def get_extent(data: xr.DataArray) -> list[float]:
 
     Returns
     -------
-    list[float]
-        Extent as [x_min, x_max, y_min, y_max]
+    tuple[float, float, float, float]
+        Extent as (x_min, x_max, y_min, y_max)
     """
     x_dim, y_dim = get_dim_names(data)
-    return [
+    return (
         float(data[x_dim].min()),
         float(data[x_dim].max()),
         float(data[y_dim].min()),
         float(data[y_dim].max()),
-    ]
+    )
 
 
 def _hillshade(
@@ -72,7 +72,7 @@ def _add_contours(
         linestyles="-",
         **kwargs,
     )
-    ax.clabel(cs, inline=True, fontsize=8)
+    ax.clabel(cs, inline=True, fontsize=8)  # ty: ignore[invalid-argument-type]
 
 
 def _plot_grid(
@@ -642,7 +642,7 @@ def plot_depth_zones(
     sorted_zones = sorted(zones)
     n_zones = len(sorted_zones)
 
-    boundaries = [data.min().values] + sorted_zones
+    boundaries = np.array([data.min().values] + sorted_zones)
     reversed_labels = labels[::-1]
 
     deep_colors = cmo.deep(np.linspace(1, 0, n_zones))

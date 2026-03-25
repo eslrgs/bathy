@@ -89,4 +89,4 @@ def test_get_extent():
         coords={"lon": [0.0, 1.0, 2.0], "lat": [50.0, 51.0, 52.0]},
         dims=["lat", "lon"],
     )
-    assert get_extent(data) == [0.0, 2.0, 50.0, 52.0]
+    assert get_extent(data) == (0.0, 2.0, 50.0, 52.0)

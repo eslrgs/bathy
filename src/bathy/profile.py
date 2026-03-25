@@ -1,9 +1,13 @@
 """Bathymetric profile functions."""
 
+from __future__ import annotations
+
 import logging
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import numpy as np
@@ -15,6 +19,9 @@ from scipy.integrate import trapezoid
 from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
 from shapely.geometry import LineString
+
+if TYPE_CHECKING:
+    from xarray.core.types import InterpOptions
 
 from bathy.utils import get_crs, get_dim_names
 
@@ -143,6 +150,7 @@ def _calculate_num_points(
             raise ValueError(f"num_points must be at least 1, got {num_points}")
         return num_points
 
+    assert point_spacing is not None
     if point_spacing <= 0:
         raise ValueError(f"point_spacing must be positive, got {point_spacing}")
 
@@ -166,7 +174,8 @@ def _sample_grid(
     """Sample *data* at *coords* using the given interpolation method."""
     if method == "nearest":
         return data.sel(coords, method="nearest").values.astype(float)
-    return data.interp(coords, method=method).values.astype(float)
+    interp_method: InterpOptions = method  # ty: ignore[invalid-assignment]
+    return data.interp(coords, method=interp_method).values.astype(float)
 
 
 def _validate_method(method: str) -> None:
@@ -365,7 +374,7 @@ def extract_profile(
 
 def profile_from_coordinates(
     data: xr.DataArray,
-    coordinates: list[tuple[float, float]],
+    coordinates: Sequence[tuple[float, float]],
     point_spacing: float | None = None,
     name: str | None = None,
     metadata: dict | None = None,

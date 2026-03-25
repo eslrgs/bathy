@@ -54,7 +54,7 @@ def _motion(drawer, lon, lat):
 def _key_press(drawer, key):
     """Simulate a key press event."""
     canvas = drawer._fig.canvas
-    event = KeyEvent("key_press_event", canvas, 0, 0)
+    event = KeyEvent("key_press_event", canvas, key)
     event.key = key
     canvas.callbacks.process("key_press_event", event)
 
