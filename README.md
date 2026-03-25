@@ -9,6 +9,8 @@ Python package for exploring bathymetric grids.
 
 ## Basic usage
 
+### Load data
+
 ```python
 import bathy
 
@@ -17,33 +19,39 @@ data = bathy.load_bathymetry("GEBCO_2025.nc", lon_range=(-10, 0), lat_range=(50,
 
 # Or download GEBCO data via OPeNDAP
 data = bathy.load_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
+```
 
-# Analyse
-bathy.summary(data)
-bathy.slope(data)
+### Visualise
 
-# Visualise
+```python
 bathy.plot_bathy(data)
-bathy.plot_slope(data)
-bathy.plot_depth_zones(data)
+```
 
-# Profiles
-prof = bathy.extract_profile(data, (-8, 52), (-2, 58), name="Celtic Sea")
-bathy.profile_stats(prof)
-bathy.plot_profile(prof)
+![Bathymetry](docs/assets/images/plot_bathy.png)
 
-# Canyon analysis
+### Analysis overview
+
+```python
+bathy.plot_overview(data)
+```
+
+![Overview](docs/assets/images/plot_overview.png)
+
+### Profiles and canyon analysis
+
+```python
+prof = bathy.extract_profile(data, (-11.3, 48.7), (-7.3, 47.2), name="Along-slope")
+bathy.plot_profile(prof, show_map=True, bathymetry_data=data)
+```
+
+![Profile](docs/assets/images/plot_profile.png)
+
+```python
 canyons = bathy.get_canyons(prof, prominence=100)
 bathy.plot_canyons(prof, canyons)
-
-# Multiple profiles
-profiles = [
-    bathy.extract_profile(data, (-8, lat), (-2, lat + 6), name=f"{lat}N")
-    for lat in [52, 53, 54]
-]
-bathy.plot_profiles(profiles)
-bathy.compare_stats(profiles)
 ```
+
+![Canyons](docs/assets/images/plot_canyons.png)
 
 ## Installation
 

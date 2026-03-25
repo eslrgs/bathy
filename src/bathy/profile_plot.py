@@ -32,6 +32,7 @@ def plot_profile(
     ensure_descending: bool = False,
     cmap=cmo.deep_r,
     bathymetry_data: xr.DataArray | None = None,
+    y_pad: float = 0.05,
     **kwargs,
 ) -> tuple[Figure, list[Axes]]:
     """
@@ -50,6 +51,9 @@ def plot_profile(
         If True, orient profile to descend from higher to lower elevation.
     bathymetry_data : xr.DataArray, optional
         Background data for map view (required when show_map=True).
+    y_pad : float
+        Fractional padding added above and below the elevation range.
+        Defaults to 0.05 (5%).
     **kwargs
         Additional arguments passed to matplotlib plot()
 
@@ -71,7 +75,9 @@ def plot_profile(
     if normalize:
         distances, elevations = _normalise_profile(distances, elevations)
 
-    ylim = (float(elevations.min()), float(elevations.max()))
+    elev_range = float(elevations.max() - elevations.min())
+    pad = elev_range * y_pad
+    ylim = (float(elevations.min()) - pad, float(elevations.max()) + pad)
     xlim = (float(distances.min()), float(distances.max()))
 
     if show_map:
@@ -102,7 +108,7 @@ def plot_profile(
         fig, ax_profile = plt.subplots(figsize=(12, 5))
 
     ax_profile.plot(distances, elevations, **kwargs)
-    ax_profile.fill_between(distances, elevations, elevations.min(), alpha=0.3)
+    ax_profile.fill_between(distances, elevations, ylim[0], alpha=0.3)
 
     ax_profile.set_xlabel("Normalized distance" if normalize else "Distance (km)")
     ax_profile.set_ylabel("Normalized elevation" if normalize else "Elevation (m)")
@@ -354,6 +360,7 @@ def plot_profiles_grid(
     smooth: float | None = None,
     normalize: bool = False,
     ensure_descending: bool = False,
+    y_pad: float = 0.05,
     **kwargs,
 ) -> tuple[Figure, np.ndarray]:
     """
@@ -374,6 +381,9 @@ def plot_profiles_grid(
         If True, normalize each profile's elevation and distance to 0-1.
     ensure_descending : bool
         If True, orient profiles to descend from higher to lower elevation.
+    y_pad : float
+        Fractional padding added above and below the elevation range.
+        Defaults to 0.05 (5%).
     **kwargs
         Additional arguments passed to matplotlib plot()
 
@@ -418,11 +428,13 @@ def plot_profiles_grid(
         if normalize:
             distances, elevations = _normalise_profile(distances, elevations)
 
-        ylim = (float(elevations.min()), float(elevations.max()))
+        elev_range = float(elevations.max() - elevations.min())
+        pad = elev_range * y_pad
+        ylim = (float(elevations.min()) - pad, float(elevations.max()) + pad)
         xlim = (float(distances.min()), float(distances.max()))
 
         ax.plot(distances, elevations, **kwargs)
-        ax.fill_between(distances, elevations, elevations.min(), alpha=0.3)
+        ax.fill_between(distances, elevations, ylim[0], alpha=0.3)
 
         if main_profile is not None:
             mid_distance = distances[len(distances) // 2]

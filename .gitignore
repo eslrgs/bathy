@@ -21,5 +21,8 @@ data
 # Ruff
 .ruff_cache
 
+# Scripts
+scripts/
+
 # MkDocs
 site/

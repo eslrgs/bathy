@@ -18,3 +18,7 @@ docs-build:
 # Build package 
 build:
     uv build
+
+# Show README
+readme:
+    uvx grip README.md

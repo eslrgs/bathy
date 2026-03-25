@@ -1028,15 +1028,18 @@ def get_canyons(
         shoulder_elev = min(elevations[li], elevations[ri])
 
         # Search outward from the trough on each side to find the first
-        # crossing of the shoulder elevation (reversed slice for the left).
+        # crossing of the shoulder elevation, but only up to the bounding
+        # peak so the width stays within the canyon walls.
+        left_slice = slice(ti - 1, li - 1 if li > 0 else None, -1)
+        right_slice = slice(ti + 1, ri + 1)
         width_start = _interp_crossing(
-            elevations[ti - 1 :: -1],
-            distances_m[ti - 1 :: -1],
+            elevations[left_slice],
+            distances_m[left_slice],
             shoulder_elev,
         )
         width_end = _interp_crossing(
-            elevations[ti + 1 :],
-            distances_m[ti + 1 :],
+            elevations[right_slice],
+            distances_m[right_slice],
             shoulder_elev,
         )
         if width_start is None or width_end is None:
