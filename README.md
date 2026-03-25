@@ -27,7 +27,9 @@ data = bathy.load_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
 bathy.plot_bathy(data)
 ```
 
-![Bathymetry](docs/assets/images/plot_bathy.png)
+<p align="center">
+  <img src="docs/assets/images/plot_bathy.png" width="600" alt="Bathymetry">
+</p>
 
 ### Analysis overview
 
@@ -35,7 +37,9 @@ bathy.plot_bathy(data)
 bathy.plot_overview(data)
 ```
 
-![Overview](docs/assets/images/plot_overview.png)
+<p align="center">
+  <img src="docs/assets/images/plot_overview.png" width="600" alt="Overview">
+</p>
 
 ### Profiles and canyon analysis
 
@@ -44,14 +48,18 @@ prof = bathy.extract_profile(data, (-11.3, 48.7), (-7.3, 47.2), name="Along-slop
 bathy.plot_profile(prof, show_map=True, bathymetry_data=data)
 ```
 
-![Profile](docs/assets/images/plot_profile.png)
+<p align="center">
+  <img src="docs/assets/images/plot_profile.png" width="600" alt="Profile">
+</p>
 
 ```python
 canyons = bathy.get_canyons(prof, prominence=100)
 bathy.plot_canyons(prof, canyons)
 ```
 
-![Canyons](docs/assets/images/plot_canyons.png)
+<p align="center">
+  <img src="docs/assets/images/plot_canyons.png" width="600" alt="Canyons">
+</p>
 
 ## Installation
 
