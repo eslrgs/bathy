@@ -1,14 +1,12 @@
 # 🌐 bathy
 
-*from Greek βαθύς (bathýs) — deep*
-
 ![Status](https://img.shields.io/badge/status-experimental-red)
 [![CI](https://github.com/eslrgs/bathy/actions/workflows/ci.yml/badge.svg)](https://github.com/eslrgs/bathy/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://eslrgs.github.io/bathy)
 ![Python](https://img.shields.io/badge/python-3.12+-yellow)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Bathymetric analysis and visualisation in Python.
+`bathy` — from Greek *βαθύς* (bathýs), "deep" — bathymetric analysis and visualisation in Python.
 
 **[Documentation](https://eslrgs.github.io/bathy)** · [Installation](#installation) · [Features](#features) · [Examples](#examples)
 
