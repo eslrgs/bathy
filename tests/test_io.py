@@ -74,13 +74,20 @@ def test_emodnet_rejects_invalid_args(kwargs, match):
         load_emodnet_wcs(**kwargs)
 
 
-def test_emodnet_caching_and_download(temp_geotiff, monkeypatch):
+def test_emodnet_caching_and_download(temp_geotiff, tmp_path, monkeypatch):
     """load_emodnet_wcs skips download when cached, downloads otherwise."""
+    import shutil
+
     calls = []
+    call_counter = [0]
 
     def mock_download(lon_range, lat_range, save_path):
         calls.append({"lon_range": lon_range, "lat_range": lat_range})
-        return temp_geotiff
+        # Return a fresh copy each time so cleanup doesn't affect other calls
+        copy = tmp_path / f"emodnet_{call_counter[0]}.tif"
+        call_counter[0] += 1
+        shutil.copy(temp_geotiff, copy)
+        return str(copy)
 
     monkeypatch.setattr(io_module, "_download_emodnet", mock_download)
 

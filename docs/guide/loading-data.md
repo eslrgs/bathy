@@ -21,6 +21,16 @@ data = bathy.load_gebco_opendap(
 
 If `save_path` is provided and the file already exists, bathy will load from the file instead of downloading. This avoids redundant downloads.
 
+If `save_path` is omitted, data is downloaded to a temporary file that is automatically deleted after loading. For large regions, provide `save_path` to keep the file.
+
+### Download size
+
+Download size scales with the requested area. The full GEBCO global grid is ~8 GB. bathy estimates the download size and logs it during download. For regions estimated at over 500 MB, `save_path` is required — this prevents accidentally filling the system temp directory with large files that are immediately deleted.
+
+### Valid years
+
+GEBCO datasets are available for the following years: 2019-2025. An invalid year will raise a `ValueError`.
+
 ### Preset regions
 
 Common oceanographic regions are available as presets:
@@ -59,6 +69,8 @@ data = bathy.load_emodnet_wcs(region="north_sea")
 
 !!! note
     EMODnet coverage is limited to European seas. Requests outside this area will return an error.
+
+The same download size estimation and `save_path` requirement for large regions applies to EMODnet downloads.
 
 ## Local NetCDF files
 

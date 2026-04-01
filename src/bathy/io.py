@@ -115,6 +115,25 @@ def _resolve_region(
 # ============================================================================
 
 
+_GEBCO_VALID_YEARS = {2019, 2020, 2021, 2022, 2023, 2024, 2025}
+
+
+def _estimate_download_size_mb(
+    lon_range: tuple[float, float],
+    lat_range: tuple[float, float],
+    resolution_deg: float,
+    bytes_per_pixel: int = 4,
+) -> float:
+    """Estimate download size in MB from bounding box and grid resolution."""
+    lon_span = abs(max(lon_range) - min(lon_range))
+    lat_span = abs(max(lat_range) - min(lat_range))
+    n_pixels = (lon_span / resolution_deg) * (lat_span / resolution_deg)
+    return (n_pixels * bytes_per_pixel) / (1024 * 1024)
+
+
+_LARGE_DOWNLOAD_MB = 500
+
+
 def _download_gebco(
     lon_range: tuple[float, float],
     lat_range: tuple[float, float],
@@ -122,6 +141,24 @@ def _download_gebco(
     save_path: str | None,
 ) -> str:
     """Download GEBCO data from THREDDS server."""
+    if year not in _GEBCO_VALID_YEARS:
+        raise ValueError(
+            f"Invalid GEBCO year: {year}. Valid years: {sorted(_GEBCO_VALID_YEARS)}"
+        )
+
+    # GEBCO is a 15 arc-second grid (~0.004167 degrees)
+    estimated_mb = _estimate_download_size_mb(lon_range, lat_range, 1 / 240)
+    if estimated_mb > _LARGE_DOWNLOAD_MB:
+        if save_path is None:
+            raise ValueError(
+                f"Estimated download size is ~{estimated_mb:.0f} MB. "
+                f"For large regions, provide 'save_path' to avoid downloading "
+                f"to a temporary file that is deleted after loading."
+            )
+        logger.warning(
+            f"Large download: estimated ~{estimated_mb:.0f} MB. This may take a while."
+        )
+
     params = {
         "var": "elevation",
         "north": max(lat_range),
@@ -139,10 +176,12 @@ def _download_gebco(
     else:
         filepath = save_path
 
-    logger.info(f"Downloading GEBCO {year} data from CEDA...")
+    logger.info(
+        f"Downloading GEBCO {year} data from CEDA (estimated ~{estimated_mb:.0f} MB)..."
+    )
 
     try:
-        response = urlopen(ncss_url, timeout=120)  # noqa: S310
+        response = urlopen(ncss_url, timeout=600)  # noqa: S310
         total = int(response.headers.get("Content-Length", 0))
 
         with (
@@ -155,8 +194,8 @@ def _download_gebco(
                 f.write(chunk)
                 pbar.update(len(chunk))
     except Exception:
-        if os.path.exists(filepath) and save_path is None:
-            os.unlink(filepath)
+        if save_path is None:
+            Path(filepath).unlink(missing_ok=True)
         raise
 
     logger.info(f"Saved to {filepath}")
@@ -179,16 +218,31 @@ def _download_emodnet(
     lon_min, lon_max = min(lon_range), max(lon_range)
     lat_min, lat_max = min(lat_range), max(lat_range)
 
+    # EMODnet resolution is ~1/480 degree (~0.00208333)
+    estimated_mb = _estimate_download_size_mb(lon_range, lat_range, 1 / 480)
+    if estimated_mb > _LARGE_DOWNLOAD_MB:
+        if save_path is None:
+            raise ValueError(
+                f"Estimated download size is ~{estimated_mb:.0f} MB. "
+                f"For large regions, provide 'save_path' to avoid downloading "
+                f"to a temporary file that is deleted after loading."
+            )
+        logger.warning(
+            f"Large download: estimated ~{estimated_mb:.0f} MB. This may take a while."
+        )
+
     if save_path is None:
         fd, filepath = tempfile.mkstemp(suffix=".tif")
         os.close(fd)
     else:
         filepath = save_path
 
-    logger.info("Downloading EMODnet bathymetry data...")
+    logger.info(
+        f"Downloading EMODnet bathymetry data (estimated ~{estimated_mb:.0f} MB)..."
+    )
 
     try:
-        wcs = WebCoverageService(_EMODNET_WCS_URL, version="1.0.0", timeout=120)
+        wcs = WebCoverageService(_EMODNET_WCS_URL, version="1.0.0", timeout=600)
 
         response = wcs.getCoverage(
             identifier=_EMODNET_COVERAGE,
@@ -220,8 +274,8 @@ def _download_emodnet(
             f.write(data)
 
     except Exception:
-        if os.path.exists(filepath) and save_path is None:
-            os.unlink(filepath)
+        if save_path is None:
+            Path(filepath).unlink(missing_ok=True)
         raise
 
     logger.info(f"Saved to {filepath}")
@@ -401,14 +455,23 @@ def load_gebco_opendap(
         Preset region name. See `bathy.list_regions()`.
         Cannot be used with 'lon_range' or 'lat_range'.
     year : int, default 2025
-        GEBCO dataset year
+        GEBCO dataset year. Valid years: 2019-2025.
     save_path : str, optional
-        If provided, save the downloaded data to this path
+        If provided, save the downloaded file to this path for reuse.
+        If omitted, the data is downloaded to a temporary file that is
+        automatically deleted after loading.
 
     Returns
     -------
     xr.DataArray
         Elevation data
+
+    Notes
+    -----
+    Download size scales with the requested area. The full global grid is
+    ~8 GB. For regions larger than ~500 MB, ``save_path`` is required to
+    avoid downloading to a temporary file. Large downloads will log a
+    warning with the estimated size.
 
     References
     ----------
@@ -419,6 +482,8 @@ def load_gebco_opendap(
     --------
     >>> data = load_gebco_opendap(lon_range=(-10, -5), lat_range=(50, 55))
     >>> data = load_gebco_opendap(region='mediterranean')
+    >>> # Large region — use save_path to keep the file
+    >>> data = load_gebco_opendap(region='pacific', save_path='pacific.nc')
     """
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
@@ -432,7 +497,11 @@ def load_gebco_opendap(
     else:
         filepath = _download_gebco(lon_range, lat_range, year, save_path)
 
-    return load_bathymetry(filepath)
+    try:
+        return load_bathymetry(filepath)
+    finally:
+        if save_path is None:
+            Path(filepath).unlink(missing_ok=True)
 
 
 def load_emodnet_wcs(
@@ -457,8 +526,10 @@ def load_emodnet_wcs(
         Preset region name. See `bathy.list_regions()`.
         Cannot be used with 'lon_range' or 'lat_range'.
     save_path : str, optional
-        If provided, save the downloaded GeoTIFF to this path.
+        If provided, save the downloaded GeoTIFF to this path for reuse.
         If the file already exists, it is loaded without downloading.
+        If omitted, the data is downloaded to a temporary file that is
+        automatically deleted after loading.
 
     Returns
     -------
@@ -487,7 +558,11 @@ def load_emodnet_wcs(
     else:
         filepath = _download_emodnet(lon_range, lat_range, save_path)
 
-    return load_bathymetry(filepath)
+    try:
+        return load_bathymetry(filepath)
+    finally:
+        if save_path is None:
+            Path(filepath).unlink(missing_ok=True)
 
 
 def to_geotiff(

@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - `smooth` method for grid smoothing
 - `plot_interactive` for interactive Folium maps
 - `contours` extraction method
+- Download size estimation and logging for GEBCO and EMODnet downloads
+- Large download guard — `save_path` required for regions over 500 MB
+- GEBCO year validation (valid years: 2019-2025)
+- Automatic temp file cleanup when `save_path` is not provided
 - CD workflow for PyPI publishing
 - Smoke test for release pipeline
 
