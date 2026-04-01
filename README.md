@@ -1,11 +1,18 @@
-# 🌐 bathy
+# 🌐 bathy <sub>from Greek βαθύς (bathýs) — deep</sub>
 
 ![Status](https://img.shields.io/badge/status-experimental-red)
+[![CI](https://github.com/eslrgs/bathy/actions/workflows/ci.yml/badge.svg)](https://github.com/eslrgs/bathy/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://eslrgs.github.io/bathy)
+![Python](https://img.shields.io/badge/python-3.12+-yellow)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Python package for exploring bathymetric grids.
+Bathymetric analysis and visualisation in Python.
 
-**[Documentation](https://eslrgs.github.io/bathy)** · [Installation](#installation) · [Examples](#examples)
+**[Documentation](https://eslrgs.github.io/bathy)** · [Installation](#installation) · [Features](#features) · [Examples](#examples)
+
+## Motivation
+
+I found creating bathymetric plots and profiles in Python surprisingly difficult. `bathy` provides a simple, high-level interface for loading, analysing, and visualising bathymetry data, so you can go from raw grid to reproducible quantitative analysis to finished figure with minimal effort.
 
 ## Basic usage
 
@@ -64,52 +71,38 @@ bathy.plot_canyons(prof, canyons)
 ## Installation
 
 ```bash
+# From GitHub
+uv pip install git+https://github.com/eslrgs/bathy.git
+
+# Or from a local clone
+git clone https://github.com/eslrgs/bathy.git
+cd bathy
 uv pip install .
 ```
 
 ## Features
 
-| Category | Functions |
+| Category | Description |
 |---|---|
-| **IO** | `load_bathymetry`, `load_gebco_opendap`, `load_emodnet_wcs`, `to_geotiff`, `list_regions` |
-| **Bathymetric analysis** | `slope`, `aspect`, `curvature`, `rugosity`, `bpi`, `geomorphons`, `contours`, `smooth`, `hypsometric_index`, `hypsometric_curve`, `summary` |
-| **Grid plotting** | `plot_bathy`, `plot_hillshade`, `plot_slope`, `plot_aspect`, `plot_curvature`, `plot_bpi`, `plot_rugosity`, `plot_geomorphons`, `plot_overview`, `plot_depth_zones`, `plot_histogram`, `plot_surface3d`, `plot_hypsometric_curve`, `plot_interactive` |
-| **Profiles** | `extract_profile`, `profile_from_coordinates`, `cross_sections`, `profiles_from_file`, `profiles_from_gdf` |
-| **Profile analysis** | `profile_stats`, `max_depth`, `gradient`, `concavity_index`, `knickpoints`, `get_canyons`, `compare_stats`, `to_gdf` |
-| **Profile plotting** | `plot_profile`, `plot_profiles`, `plot_profiles_grid`, `plot_profiles_map`, `plot_gradient`, `plot_knickpoints`, `plot_canyons` |
-| **Draw** | `draw_profile` — draw and edit profiles on a map with drag, undo, delete, and insert waypoints (PyQt6 desktop window) |
+| **IO** | Load from local files (NetCDF, GeoTIFF), GEBCO OPeNDAP, or EMODnet WCS. Export to GeoTIFF. 28 preset regions included. |
+| **Analysis** | Slope, aspect, curvature, rugosity, BPI, geomorphons, contours, smoothing, hypsometric analysis |
+| **Plotting** | Publication-ready bathymetry, hillshade, slope, aspect, overview, 3D surface, depth zones, histograms, interactive maps |
+| **Profiles** | Extract profiles between points, generate cross-sections, load from file or GeoDataFrame |
+| **Profile analysis** | Statistics, gradient, concavity, knickpoints, canyon detection, comparison across profiles |
+| **Draw** | Interactive PyQt6 desktop tool for drawing and editing profiles with drag, undo, and waypoint editing |
 
-## Preset regions
-
-28 preset regions available:
-
-```python
-import bathy
-
-bathy.list_regions()  # ['arabian_sea', 'baltic_sea', 'bay_of_bengal', ...]
-
-data = bathy.load_gebco_opendap(region="mediterranean")
-```
+See the [full API reference](https://eslrgs.github.io/bathy) for details.
 
 ## Examples
 
 See [examples/basic_usage.ipynb](examples/basic_usage.ipynb), [examples/profiles.ipynb](examples/profiles.ipynb), and [examples/draw_profile.py](examples/draw_profile.py).
 
-### Profile drawing (desktop app)
+### Profile drawing
 
-Draw profiles interactively in a PyQt6 window. Requires `uv pip install bathy[draw]`.
+Draw profiles interactively in a PyQt6 desktop window. Requires `uv pip install bathy[draw]`.
 
 ```bash
 uv run bathy-draw path/to/data.nc
-```
-
-Or from Python:
-
-```python
-import bathy
-
-data = bathy.load_bathymetry("data.nc")
-profiles = bathy.draw_profile(data)
 ```
 
 - Left-click to add waypoints, right-click to finish a profile, double-click to stop
@@ -129,6 +122,10 @@ pre-commit install
 just format  # Format and lint
 just test    # Run tests
 ```
+
+## Use of AI
+
+This project was developed with assistance from AI, which was used for code generation, documentation, and testing.
 
 ## License
 
