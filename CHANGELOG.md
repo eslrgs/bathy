@@ -5,11 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-01
+
 ### Added
 - `load_emodnet_wcs` for loading data from EMODnet WCS
 - `smooth` method for grid smoothing
 - `plot_interactive` for interactive Folium maps
 - `contours` extraction method
+- CD workflow for PyPI publishing
+- Smoke test for release pipeline
 
 ### Fixed
 - Canyon width detection accuracy

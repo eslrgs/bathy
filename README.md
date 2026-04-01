@@ -71,13 +71,13 @@ bathy.plot_canyons(prof, canyons)
 ## Installation
 
 ```bash
-# From GitHub
-uv pip install git+https://github.com/eslrgs/bathy.git
+pip install bathy
+```
 
-# Or from a local clone
-git clone https://github.com/eslrgs/bathy.git
-cd bathy
-uv pip install .
+Or with uv:
+
+```bash
+uv add bathy
 ```
 
 ## Features

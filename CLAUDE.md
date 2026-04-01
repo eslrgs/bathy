@@ -22,7 +22,6 @@ Lightweight Python package for exploring bathymetric data, targeting academic us
 - NumPy-style docstrings
 - Python 3.12+, use ty-compatible types (e.g. `tuple[float, float] | None`)
 - Grid methods return `xarray.DataArray`; tabular methods return `polars.DataFrame`
-- Plotting functions return `tuple[Figure, list[Axes]]`
 - Don't use OOP architecture — use functions, not class hierarchies; dataclasses for data containers are fine
 
 ## Conventions
