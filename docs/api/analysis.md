@@ -9,6 +9,11 @@
 ::: bathy.hypsometric_index
 ::: bathy.hypsometric_curve
 
+## Volume & Area
+
+::: bathy.volume
+::: bathy.area
+
 ## Bathymetry
 
 ::: bathy.slope

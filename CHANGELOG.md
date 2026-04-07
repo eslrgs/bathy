@@ -6,6 +6,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Volume & area**: `volume` and `area` calculations 
+- `hypsometric_curve` gains `absolute=True` option for depth-area curves in real units
 - **Grid operations**: new `grid` module with `clip`, `resample`, `reproject`, `merge`, `fill_gaps`
 - `resample` supports both `resolution_degrees` and `resolution_m` parameters
 - `clip` supports region presets and vector file paths in addition to GeoDataFrames

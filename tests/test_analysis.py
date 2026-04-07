@@ -8,6 +8,7 @@ import xarray as xr
 
 from bathy.analysis import (
     _cell_size_metres,
+    area,
     aspect,
     bpi,
     contours,
@@ -19,6 +20,7 @@ from bathy.analysis import (
     slope,
     smooth,
     summary,
+    volume,
 )
 
 
@@ -455,3 +457,85 @@ def test_smooth_invalid_sigma(fake_bathy, sigma):
     """Non-positive sigma_km raises ValueError."""
     with pytest.raises(ValueError, match="sigma_km must be positive"):
         smooth(fake_bathy, sigma_km=sigma)
+
+
+# Volume & area tests
+
+
+def test_volume_positive(fake_bathy):
+    """Volume should be positive for bathymetry below the upper level."""
+    vol = volume(fake_bathy, upper_level=0)
+
+    assert vol > 0
+
+
+def test_volume_flat_basin():
+    """Volume of a uniform flat basin is depth * total area."""
+    n = 10
+    data = xr.DataArray(
+        np.full((n, n), -100.0),
+        coords={
+            "x": np.linspace(0, 900, n),
+            "y": np.linspace(0, 900, n),
+        },
+        dims=["y", "x"],
+        name="elevation",
+    )
+    import rioxarray  # noqa: F401
+
+    data = data.rio.write_crs("EPSG:32629")
+
+    vol = volume(data, upper_level=0)
+    dy = 100.0
+    dx = 100.0
+    expected = 100.0 * dy * dx * n * n
+    assert abs(vol - expected) / expected < 1e-6
+
+
+def test_volume_bounded_range(fake_bathy):
+    """Volume with bounded range should be less than full volume."""
+    full_vol = volume(fake_bathy, upper_level=0)
+    partial_vol = volume(fake_bathy, upper_level=0, lower_level=-50)
+
+    assert partial_vol < full_vol
+
+
+def test_volume_invalid_levels(fake_bathy):
+    """upper_level < lower_level raises ValueError."""
+    with pytest.raises(ValueError, match="upper_level"):
+        volume(fake_bathy, upper_level=-100, lower_level=0)
+
+
+def test_area_positive(fake_bathy):
+    """Area should be positive."""
+    a = area(fake_bathy, upper_level=0)
+
+    assert a > 0
+
+
+def test_area_bounded_less_than_full(fake_bathy):
+    """Area with bounded range should be less than or equal to full area."""
+    full_a = area(fake_bathy, upper_level=0)
+    partial_a = area(fake_bathy, upper_level=-25, lower_level=-75)
+
+    assert partial_a <= full_a
+
+
+def test_area_true_surface_greater(fake_bathy):
+    """True surface area should be >= planimetric area."""
+    plan_a = area(fake_bathy, upper_level=0, true_surface=False)
+    true_a = area(fake_bathy, upper_level=0, true_surface=True)
+
+    assert true_a >= plan_a
+
+
+def test_hypsometric_curve_absolute(fake_bathy):
+    """absolute=True returns depth and cumulative_area columns."""
+    df = hypsometric_curve(fake_bathy, bins=50, absolute=True)
+
+    assert isinstance(df, pl.DataFrame)
+    assert set(df.columns) == {"depth", "cumulative_area"}
+    assert len(df) == 50
+
+    cum_area = df["cumulative_area"].to_numpy()
+    assert np.all(np.diff(cum_area) <= 1e-6)

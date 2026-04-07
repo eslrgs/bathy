@@ -5,6 +5,7 @@ from importlib.metadata import version
 
 from bathy import profile
 from bathy.analysis import (
+    area,
     aspect,
     bpi,
     contours,
@@ -16,6 +17,7 @@ from bathy.analysis import (
     slope,
     smooth,
     summary,
+    volume,
 )
 from bathy.datasets import sample_data
 from bathy.grid import (
@@ -111,6 +113,8 @@ __all__ = [
     "geomorphons",
     "contours",
     "smooth",
+    "volume",
+    "area",
     # Plotting
     "plot_bathy",
     "plot_hillshade",

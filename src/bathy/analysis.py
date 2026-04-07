@@ -199,39 +199,78 @@ def hypsometric_index(data: xr.DataArray) -> float:
     return float((h_mean - h_min) / (h_max - h_min))
 
 
-def hypsometric_curve(data: xr.DataArray, bins: int = 100) -> pl.DataFrame:
+def hypsometric_curve(
+    data: xr.DataArray,
+    bins: int = 100,
+    absolute: bool = False,
+) -> pl.DataFrame:
     """
     Calculate the hypsometric curve.
 
     Parameters
     ----------
     data : xr.DataArray
-        Elevation data
+        Elevation data.
     bins : int, default 100
-        Number of elevation bins
+        Number of elevation bins.
+    absolute : bool, default False
+        If False, return normalised relative_area (0–1) and
+        relative_elevation (0–1).  If True, return absolute
+        ``depth`` (metres) and ``cumulative_area`` (m²).
 
     Returns
     -------
     pl.DataFrame
-        DataFrame with columns ``relative_area`` (cumulative proportion of
-        area above each elevation, 1 to 0) and ``relative_elevation``
-        (normalised elevation, 0 = min, 1 = max).
+        When *absolute* is False: columns ``relative_area`` and
+        ``relative_elevation``.
+        When *absolute* is True: columns ``depth`` (bin centres in
+        metres) and ``cumulative_area`` (m²).
 
     Examples
     --------
     >>> df = hypsometric_curve(data)
     >>> plt.plot(df["relative_area"], df["relative_elevation"])
+
+    Absolute depth-area curve:
+
+    >>> df = hypsometric_curve(data, absolute=True)
+    >>> plt.plot(df["cumulative_area"], df["depth"])
     """
     if bins <= 0:
         raise ValueError(f"bins must be positive, got {bins}")
 
-    values = _clean_values(data)
-    if len(values) == 0:
+    z = data.values.astype(float)
+    cell_area = _cell_areas(data)
+
+    valid = ~np.isnan(z)
+    z_valid = z[valid]
+    area_valid = cell_area[valid]
+
+    if len(z_valid) == 0:
+        if absolute:
+            return pl.DataFrame(
+                schema={
+                    "depth": pl.Float64,
+                    "cumulative_area": pl.Float64,
+                }
+            )
         return pl.DataFrame(
-            schema={"relative_area": pl.Float64, "relative_elevation": pl.Float64}
+            schema={
+                "relative_area": pl.Float64,
+                "relative_elevation": pl.Float64,
+            }
         )
-    h_min, h_max = values.min(), values.max()
+
+    h_min, h_max = z_valid.min(), z_valid.max()
+
     if h_max == h_min:
+        if absolute:
+            return pl.DataFrame(
+                {
+                    "depth": np.full(bins, h_min),
+                    "cumulative_area": np.full(bins, float(area_valid.sum())),
+                }
+            )
         return pl.DataFrame(
             {
                 "relative_area": np.ones(bins),
@@ -240,18 +279,30 @@ def hypsometric_curve(data: xr.DataArray, bins: int = 100) -> pl.DataFrame:
         )
 
     bin_edges = np.linspace(h_min, h_max, bins + 1)
-    counts, _ = np.histogram(values, bins=bin_edges)
-
-    cumulative = np.cumsum(counts[::-1])[::-1]
-    relative_area = cumulative / cumulative[0]
-
     bin_centres = (bin_edges[:-1] + bin_edges[1:]) / 2
-    relative_elevation = (bin_centres - h_min) / (h_max - h_min)
+
+    # Sum cell area per bin
+    indices = np.digitize(z_valid, bin_edges)
+    indices = np.clip(indices, 1, bins)
+    bin_area = np.zeros(bins)
+    for i in range(len(z_valid)):
+        bin_area[indices[i] - 1] += area_valid[i]
+
+    # Cumulative from shallowest (highest elevation) down
+    cumulative = np.cumsum(bin_area[::-1])[::-1]
+
+    if absolute:
+        return pl.DataFrame(
+            {
+                "depth": bin_centres,
+                "cumulative_area": cumulative,
+            }
+        )
 
     return pl.DataFrame(
         {
-            "relative_area": relative_area,
-            "relative_elevation": relative_elevation,
+            "relative_area": cumulative / cumulative[0],
+            "relative_elevation": (bin_centres - h_min) / (h_max - h_min),
         }
     )
 
@@ -653,3 +704,141 @@ def smooth(
     result[mask] = np.nan
 
     return xr.DataArray(result, coords=data.coords, dims=data.dims, name="elevation")
+
+
+# ============================================================================
+# Volume & area calculations
+# ============================================================================
+
+
+def _cell_areas(data: xr.DataArray) -> np.ndarray:
+    """Return a 2-D array of per-cell planimetric areas in m².
+
+    For projected CRS every cell has the same area.  For geographic CRS
+    the east-west extent shrinks with latitude, so areas are computed
+    per row using the same geodesic logic as ``_cell_size_metres``.
+    """
+    dy, dx = _cell_size_metres(data)
+
+    if is_projected(data):
+        return np.full(data.shape, dy * dx)
+
+    # Geographic: dx varies by latitude row
+    x_dim, y_dim = get_dim_names(data)
+    geod = Geodesic.WGS84
+    lon_spacing = np.abs(np.diff(data[x_dim].values).mean())
+    lon_centre = float(data[x_dim].mean())
+
+    areas = np.empty(data.shape, dtype=float)
+    for i, lat in enumerate(data[y_dim].values):
+        row_dx = geod.Inverse(
+            float(lat), lon_centre, float(lat), lon_centre + lon_spacing
+        )["s12"]
+        areas[i, :] = dy * row_dx
+
+    return areas
+
+
+def volume(
+    data: xr.DataArray,
+    upper_level: float = 0,
+    lower_level: float | None = None,
+) -> float:
+    """
+    Calculate water volume between two depth levels.
+
+    Volume is computed as the sum of per-cell water columns multiplied
+    by the planimetric cell area.  Only cells whose elevation falls
+    between *lower_level* and *upper_level* contribute.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Elevation data (negative = below sea level).
+    upper_level : float, default 0
+        Upper bounding elevation in metres.
+    lower_level : float, optional
+        Lower bounding elevation in metres.  Defaults to the minimum
+        elevation in *data*.
+
+    Returns
+    -------
+    float
+        Volume in m³.
+
+    Examples
+    --------
+    >>> vol = volume(data, upper_level=0, lower_level=-500)
+    """
+    z = data.values.astype(float)
+
+    if lower_level is None:
+        lower_level = float(np.nanmin(z))
+
+    if upper_level < lower_level:
+        raise ValueError(
+            f"upper_level ({upper_level}) must be >= lower_level ({lower_level})"
+        )
+
+    cell_area = _cell_areas(data)
+
+    # Water column: clamp elevation into [lower, upper], measure gap to upper
+    water_col = upper_level - np.clip(z, lower_level, upper_level)
+    water_col = np.where(np.isnan(z), 0.0, water_col)
+
+    return float(np.sum(water_col * cell_area))
+
+
+def area(
+    data: xr.DataArray,
+    upper_level: float = 0,
+    lower_level: float | None = None,
+    true_surface: bool = False,
+) -> float:
+    """
+    Calculate seafloor area between two depth levels.
+
+    Parameters
+    ----------
+    data : xr.DataArray
+        Elevation data (negative = below sea level).
+    upper_level : float, default 0
+        Upper bounding elevation in metres.
+    lower_level : float, optional
+        Lower bounding elevation in metres.  Defaults to the minimum
+        elevation in *data*.
+    true_surface : bool, default False
+        If True, compute true (slope-corrected) surface area rather than
+        planimetric area.  Each cell's area is divided by cos(slope).
+
+    Returns
+    -------
+    float
+        Area in m².
+
+    Examples
+    --------
+    >>> a = area(data, upper_level=0, lower_level=-200)
+    """
+    z = data.values.astype(float)
+
+    if lower_level is None:
+        lower_level = float(np.nanmin(z))
+
+    if upper_level < lower_level:
+        raise ValueError(
+            f"upper_level ({upper_level}) must be >= lower_level ({lower_level})"
+        )
+
+    cell_area = _cell_areas(data)
+    mask = ~np.isnan(z) & (z <= upper_level) & (z >= lower_level)
+
+    if true_surface:
+        gy, gx, _, _ = _gradients(data)
+        slope_rad = np.arctan(np.sqrt(gx**2 + gy**2))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            surface_factor = 1.0 / np.cos(slope_rad)
+        surface_factor = np.where(np.isfinite(surface_factor), surface_factor, 1.0)
+        cell_area = cell_area * surface_factor
+
+    return float(np.sum(np.where(mask, cell_area, 0.0)))

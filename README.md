@@ -86,7 +86,7 @@ uv add bathy
 |---|---|
 | **IO** | Load from local files (NetCDF, GeoTIFF), GEBCO OPeNDAP, or EMODnet WCS. Export to GeoTIFF. 28 preset regions included. |
 | **Grid operations** | Clip, resample (by degrees or metres), reproject, merge overlapping grids, fill NaN gaps |
-| **Analysis** | Slope, aspect, curvature, rugosity, BPI, geomorphons, contours, smoothing, hypsometric analysis |
+| **Analysis** | Slope, aspect, curvature, rugosity, BPI, geomorphons, contours, smoothing, hypsometric analysis, volume & area calculations |
 | **Plotting** | Publication-ready bathymetry, hillshade, slope, aspect, overview, 3D surface, depth zones, histograms, interactive maps |
 | **Profiles** | Extract profiles between points, generate cross-sections, load from file or GeoDataFrame |
 | **Profile analysis** | Statistics, gradient, concavity, knickpoints, canyon detection, comparison across profiles |
