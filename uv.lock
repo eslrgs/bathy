@@ -181,6 +181,7 @@ draw = [
 ]
 notebook = [
     { name = "ipykernel" },
+    { name = "ipywidgets" },
     { name = "jupyter" },
 ]
 
@@ -203,6 +204,7 @@ requires-dist = [
     { name = "geographiclib", specifier = ">=2.0" },
     { name = "geopandas", specifier = ">=0.14.0" },
     { name = "ipykernel", marker = "extra == 'notebook'", specifier = ">=6.0.0" },
+    { name = "ipywidgets", marker = "extra == 'notebook'", specifier = ">=8.0.0" },
     { name = "jupyter", marker = "extra == 'notebook'", specifier = ">=1.0.0" },
     { name = "matplotlib", specifier = ">=3.8.0" },
     { name = "netcdf4", specifier = ">=1.6.0" },

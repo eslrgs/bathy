@@ -56,6 +56,7 @@ nav:
       - Draw Profile: examples/draw_profile.py
   - API Reference:
       - IO: api/io.md
+      - Grid Operations: api/grid.md
       - Analysis: api/analysis.md
       - Plotting: api/plot.md
       - Profile: api/profile.md

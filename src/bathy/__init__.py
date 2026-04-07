@@ -18,6 +18,13 @@ from bathy.analysis import (
     summary,
 )
 from bathy.datasets import sample_data
+from bathy.grid import (
+    clip,
+    fill_gaps,
+    merge,
+    reproject,
+    resample,
+)
 from bathy.io import (
     list_regions,
     load_bathymetry,
@@ -80,6 +87,12 @@ def draw_profile(*args, **kwargs):
 __all__ = [
     # Datasets
     "sample_data",
+    # Grid operations
+    "clip",
+    "resample",
+    "reproject",
+    "merge",
+    "fill_gaps",
     # IO
     "list_regions",
     "load_bathymetry",

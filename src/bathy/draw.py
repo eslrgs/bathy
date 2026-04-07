@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import cmocean.cm as cmo
 import numpy as np
@@ -457,14 +458,15 @@ def draw_profile(
         from matplotlib.backends.backend_qtagg import (
             NavigationToolbar2QT as NavigationToolbar,
         )
-        from PyQt6.QtCore import QEventLoop, Qt  # ty: ignore[unresolved-import]
-        from PyQt6.QtGui import (  # ty: ignore[unresolved-import]
+        from PyQt6.QtCore import QEventLoop, Qt
+        from PyQt6.QtGui import (
+            QCloseEvent,
             QFont,
             QIcon,
             QPainter,
             QPixmap,
         )
-        from PyQt6.QtWidgets import (  # ty: ignore[unresolved-import]
+        from PyQt6.QtWidgets import (
             QApplication,
             QFileDialog,
             QHBoxLayout,
@@ -501,7 +503,9 @@ def draw_profile(
             painter.end()
             icon = QIcon(pixmap)
             self.setWindowIcon(icon)
-            QApplication.instance().setWindowIcon(icon)
+            app_instance = QApplication.instance()
+            if app_instance is not None:
+                app_instance.setWindowIcon(icon)  # ty: ignore[unresolved-attribute]
             self._logic = logic
             self._updating_list = False
 
@@ -644,7 +648,7 @@ def draw_profile(
                 "GeoPackage (*.gpkg);;Shapefile (*.shp);;GeoJSON (*.geojson)",
             )
             if path:
-                to_gdf(profs).to_file(path)
+                to_gdf(profs).to_file(Path(path))
 
         def _confirm_close(self) -> bool:
             """Ask for confirmation if there are profiles that could be lost."""
@@ -678,15 +682,15 @@ def draw_profile(
             if self._confirm_close():
                 self._do_finish_and_close()
 
-        def closeEvent(self, event) -> None:  # noqa: N802
+        def closeEvent(self, a0: QCloseEvent | None) -> None:  # noqa: N802
             if self._logic.done:
-                super().closeEvent(event)
+                super().closeEvent(a0)
                 return
             if self._confirm_close():
                 self._logic._do_finish()
-                super().closeEvent(event)
-            else:
-                event.ignore()
+                super().closeEvent(a0)
+            elif a0 is not None:
+                a0.ignore()
 
     app = QApplication.instance()
     created_app = app is None
@@ -704,7 +708,7 @@ def draw_profile(
     window.show()
     window._canvas.setFocus()
 
-    if created_app:
+    if created_app and app is not None:
         app.exec()
     else:
         loop = QEventLoop()

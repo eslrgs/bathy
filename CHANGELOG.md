@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Grid operations**: new `grid` module with `clip`, `resample`, `reproject`, `merge`, `fill_gaps`
+- `resample` supports both `resolution_degrees` and `resolution_m` parameters
+- `clip` supports region presets and vector file paths in addition to GeoDataFrames
+- `merge` handles overlapping grids with configurable strategy (mean, min, max, first)
+- Grid operations notebook example (`examples/grid_operations.ipynb`)
+- API docs page for grid operations
+- `ipywidgets` added to notebook optional dependencies
+
 ## [0.2.0] - 2026-04-01
 
 ### Added

@@ -51,6 +51,7 @@ draw = ["PyQt6>=6.5.0"]
 notebook = [
     "jupyter>=1.0.0",
     "ipykernel>=6.0.0",
+    "ipywidgets>=8.0.0",
 ]
 
 [dependency-groups]
@@ -72,6 +73,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 source-exclude = ["tests/", "examples/", "docs/", "data/", "site/", "**/.DS_Store"]
 wheel-exclude = ["**/.DS_Store"]
+
+[tool.ty.src]
+exclude = ["examples/", "tests/"]
 
 [tool.ty.environment]
 extra-paths = ["typings"]
