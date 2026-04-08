@@ -26,3 +26,4 @@ scripts/
 
 # MkDocs
 site/
+.cache/

@@ -4,21 +4,31 @@ This guide covers the basics of loading bathymetry data and creating visualisati
 
 ## Loading data
 
-### From GEBCO
+### From remote sources
 
-The easiest way to get started is to download data directly from the GEBCO OPeNDAP server:
+The easiest way to get started is to download data directly. Several global and regional sources are available:
 
 ```python
 import bathy
 
+# GEBCO global (~450 m / 15 arc-second)
 data = bathy.load_gebco_opendap(
     lon_range=(-12, -5),
     lat_range=(46, 50),
     save_path="data/my_region.nc",  # Optional: save for reuse
 )
+
+# ETOPO 2022 global (60s / 30s / 15s resolution)
+data = bathy.load_etopo(lon_range=(-12, -5), lat_range=(46, 50), resolution="60s")
+
+# EMODnet (~115 m, European seas only)
+data = bathy.load_emodnet_wcs(lon_range=(-10, -5), lat_range=(50, 55))
+
+# NOAA Coastal Relief Model (~90 m, US coasts only)
+data = bathy.load_noaa_crm(lon_range=(-72, -70), lat_range=(41, 43))
 ```
 
-If `save_path` exists, the download is skipped and data is loaded from the file.
+If `save_path` is provided and the file already exists, the download is skipped and data is loaded from the file.
 
 ### Using preset regions
 
@@ -30,7 +40,7 @@ import bathy
 # See available regions
 print(bathy.list_regions())
 
-# Load a preset region
+# Load a preset region — works with any load function
 data = bathy.load_gebco_opendap(region="mediterranean")
 ```
 

@@ -24,8 +24,11 @@ import bathy
 # Load from file
 data = bathy.load_bathymetry("GEBCO_2025.nc", lon_range=(-10, 0), lat_range=(50, 60))
 
-# Or download GEBCO data via OPeNDAP
-data = bathy.load_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))
+# Or download from multiple global and regional sources
+data = bathy.load_gebco_opendap(lon_range=(-10, 0), lat_range=(50, 60))       # GEBCO ~450 m
+data = bathy.load_etopo(lon_range=(-10, 0), lat_range=(50, 60))               # ETOPO 60s/30s/15s
+data = bathy.load_emodnet_wcs(lon_range=(-10, 0), lat_range=(50, 60))         # EMODnet ~115 m (Europe)
+data = bathy.load_noaa_crm(lon_range=(-72, -70), lat_range=(41, 43))          # NOAA CRM ~90 m (US coasts)
 ```
 
 ### Visualise
@@ -84,7 +87,7 @@ uv add bathy
 
 | Category | Description |
 |---|---|
-| **IO** | Load from local files (NetCDF, GeoTIFF), GEBCO OPeNDAP, or EMODnet WCS. Export to GeoTIFF. 28 preset regions included. |
+| **IO** | Load from local files (NetCDF, GeoTIFF), GEBCO, ETOPO, EMODnet, or NOAA CRM. Export to GeoTIFF. 28 preset regions included. |
 | **Grid operations** | Clip, resample (by degrees or metres), reproject, merge overlapping grids, fill NaN gaps |
 | **Analysis** | Slope, aspect, curvature, rugosity, BPI, geomorphons, contours, smoothing, hypsometric analysis, volume & area calculations |
 | **Plotting** | Publication-ready bathymetry, hillshade, slope, aspect, overview, 3D surface, depth zones, histograms, interactive maps |
@@ -96,7 +99,7 @@ See the [full API reference](https://eslrgs.github.io/bathy) for details.
 
 ## Examples
 
-See [examples/basic_usage.ipynb](examples/basic_usage.ipynb), [examples/profiles.ipynb](examples/profiles.ipynb), [examples/grid_operations.ipynb](examples/grid_operations.ipynb), and [examples/draw_profile.py](examples/draw_profile.py).
+See [examples/basic_usage.ipynb](examples/basic_usage.ipynb), [examples/downloading_data.ipynb](examples/downloading_data.ipynb), [examples/profiles.ipynb](examples/profiles.ipynb), [examples/grid_operations.ipynb](examples/grid_operations.ipynb), and [examples/draw_profile.py](examples/draw_profile.py).
 
 ### Profile drawing
 

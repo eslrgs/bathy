@@ -104,6 +104,17 @@ def temp_netcdf(fake_bathy):
 
 
 @pytest.fixture
+def temp_netcdf_z(fake_bathy):
+    """Temporary NetCDF file with variable name 'z' (ETOPO/IBCSO style)."""
+    da = fake_bathy.rename("z")
+    with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as tmp:
+        da.to_netcdf(tmp.name)
+        path = tmp.name
+    yield path
+    os.unlink(path)
+
+
+@pytest.fixture
 def temp_geotiff(fake_bathy):
     """Temporary GeoTIFF file for testing file loading."""
     da = fake_bathy.rename({"lon": "x", "lat": "y"})

@@ -31,7 +31,9 @@ from bathy.io import (
     list_regions,
     load_bathymetry,
     load_emodnet_wcs,
+    load_etopo,
     load_gebco_opendap,
+    load_noaa_crm,
     to_geotiff,
 )
 from bathy.plot import (
@@ -99,7 +101,9 @@ __all__ = [
     "list_regions",
     "load_bathymetry",
     "load_emodnet_wcs",
+    "load_etopo",
     "load_gebco_opendap",
+    "load_noaa_crm",
     "to_geotiff",
     # Analysis
     "summary",

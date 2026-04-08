@@ -114,8 +114,7 @@ def _resolve_region(
 # Internal helpers
 # ============================================================================
 
-
-_GEBCO_VALID_YEARS = {2019, 2020, 2021, 2022, 2023, 2024, 2025}
+_LARGE_DOWNLOAD_MB = 500
 
 
 def _estimate_download_size_mb(
@@ -131,7 +130,67 @@ def _estimate_download_size_mb(
     return (n_pixels * bytes_per_pixel) / (1024 * 1024)
 
 
-_LARGE_DOWNLOAD_MB = 500
+def _warn_if_large(
+    lon_range: tuple[float, float],
+    lat_range: tuple[float, float],
+    resolution_deg: float,
+    save_path: str | None,
+) -> float:
+    """Estimate download size, warn or error if large. Returns estimated MB."""
+    estimated_mb = _estimate_download_size_mb(lon_range, lat_range, resolution_deg)
+    if estimated_mb > _LARGE_DOWNLOAD_MB:
+        if save_path is None:
+            raise ValueError(
+                f"Estimated download size is ~{estimated_mb:.0f} MB. "
+                f"For large regions, provide 'save_path' to avoid downloading "
+                f"to a temporary file that is deleted after loading."
+            )
+        logger.warning(
+            f"Large download: estimated ~{estimated_mb:.0f} MB. This may take a while."
+        )
+    return estimated_mb
+
+
+def _download_with_progress(
+    url: str,
+    save_path: str | None,
+    *,
+    suffix: str = ".nc",
+    desc: str = "Downloading",
+    timeout: int = 600,
+) -> str:
+    """Download URL to a file with a tqdm progress bar."""
+    if save_path is None:
+        fd, filepath = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+    else:
+        filepath = save_path
+
+    try:
+        response = urlopen(url, timeout=timeout)  # noqa: S310
+        total = int(response.headers.get("Content-Length", 0))
+
+        with (
+            open(filepath, "wb") as f,
+            tqdm(total=total, unit="B", unit_scale=True, desc=desc) as pbar,
+        ):
+            while chunk := response.read(8192):
+                f.write(chunk)
+                pbar.update(len(chunk))
+    except Exception:
+        if save_path is None:
+            Path(filepath).unlink(missing_ok=True)
+        raise
+
+    logger.info(f"Saved to {filepath}")
+    return filepath
+
+
+# ---------------------------------------------------------------------------
+# Dataset-specific download helpers
+# ---------------------------------------------------------------------------
+
+_GEBCO_VALID_YEARS = {2019, 2020, 2021, 2022, 2023, 2024, 2025}
 
 
 def _download_gebco(
@@ -146,18 +205,7 @@ def _download_gebco(
             f"Invalid GEBCO year: {year}. Valid years: {sorted(_GEBCO_VALID_YEARS)}"
         )
 
-    # GEBCO is a 15 arc-second grid (~0.004167 degrees)
-    estimated_mb = _estimate_download_size_mb(lon_range, lat_range, 1 / 240)
-    if estimated_mb > _LARGE_DOWNLOAD_MB:
-        if save_path is None:
-            raise ValueError(
-                f"Estimated download size is ~{estimated_mb:.0f} MB. "
-                f"For large regions, provide 'save_path' to avoid downloading "
-                f"to a temporary file that is deleted after loading."
-            )
-        logger.warning(
-            f"Large download: estimated ~{estimated_mb:.0f} MB. This may take a while."
-        )
+    estimated_mb = _warn_if_large(lon_range, lat_range, 1 / 240, save_path)
 
     params = {
         "var": "elevation",
@@ -166,41 +214,16 @@ def _download_gebco(
         "west": min(lon_range),
         "east": max(lon_range),
     }
-
-    base_url = f"https://dap.ceda.ac.uk/thredds/ncss/bodc/gebco/global/gebco_{year}/ice_surface_elevation/netcdf/GEBCO_{year}.nc"
-    ncss_url = f"{base_url}?{urlencode(params)}"
-
-    if save_path is None:
-        fd, filepath = tempfile.mkstemp(suffix=".nc")
-        os.close(fd)
-    else:
-        filepath = save_path
+    base_url = (
+        f"https://dap.ceda.ac.uk/thredds/ncss/bodc/gebco/global/"
+        f"gebco_{year}/ice_surface_elevation/netcdf/GEBCO_{year}.nc"
+    )
+    url = f"{base_url}?{urlencode(params)}"
 
     logger.info(
-        f"Downloading GEBCO {year} data from CEDA (estimated ~{estimated_mb:.0f} MB)..."
+        f"Downloading GEBCO {year} from CEDA (estimated ~{estimated_mb:.0f} MB)..."
     )
-
-    try:
-        response = urlopen(ncss_url, timeout=600)  # noqa: S310
-        total = int(response.headers.get("Content-Length", 0))
-
-        with (
-            open(filepath, "wb") as f,
-            tqdm(
-                total=total, unit="B", unit_scale=True, desc="Downloading GEBCO"
-            ) as pbar,
-        ):
-            while chunk := response.read(8192):
-                f.write(chunk)
-                pbar.update(len(chunk))
-    except Exception:
-        if save_path is None:
-            Path(filepath).unlink(missing_ok=True)
-        raise
-
-    logger.info(f"Saved to {filepath}")
-
-    return filepath
+    return _download_with_progress(url, save_path, desc="Downloading GEBCO")
 
 
 _EMODNET_WCS_URL = "https://ows.emodnet-bathymetry.eu/wcs"
@@ -218,18 +241,7 @@ def _download_emodnet(
     lon_min, lon_max = min(lon_range), max(lon_range)
     lat_min, lat_max = min(lat_range), max(lat_range)
 
-    # EMODnet resolution is ~1/480 degree (~0.00208333)
-    estimated_mb = _estimate_download_size_mb(lon_range, lat_range, 1 / 480)
-    if estimated_mb > _LARGE_DOWNLOAD_MB:
-        if save_path is None:
-            raise ValueError(
-                f"Estimated download size is ~{estimated_mb:.0f} MB. "
-                f"For large regions, provide 'save_path' to avoid downloading "
-                f"to a temporary file that is deleted after loading."
-            )
-        logger.warning(
-            f"Large download: estimated ~{estimated_mb:.0f} MB. This may take a while."
-        )
+    estimated_mb = _warn_if_large(lon_range, lat_range, 1 / 480, save_path)
 
     if save_path is None:
         fd, filepath = tempfile.mkstemp(suffix=".tif")
@@ -237,9 +249,7 @@ def _download_emodnet(
     else:
         filepath = save_path
 
-    logger.info(
-        f"Downloading EMODnet bathymetry data (estimated ~{estimated_mb:.0f} MB)..."
-    )
+    logger.info(f"Downloading EMODnet bathymetry (estimated ~{estimated_mb:.0f} MB)...")
 
     try:
         wcs = WebCoverageService(_EMODNET_WCS_URL, version="1.0.0", timeout=600)
@@ -279,8 +289,53 @@ def _download_emodnet(
         raise
 
     logger.info(f"Saved to {filepath}")
-
     return filepath
+
+
+_ETOPO_OPENDAP_BASE = "https://www.ngdc.noaa.gov/thredds/dodsC/global/ETOPO2022"
+
+
+# NOAA CRM volume bounding boxes: (lon_min, lon_max, lat_min, lat_max)
+_CRM_VOLUMES: dict[int, tuple[float, float, float, float]] = {
+    1: (-80, -64, 40, 48),
+    2: (-85, -68, 31, 40),
+    3: (-87, -78, 24, 35),
+    4: (-94, -87, 24, 36),
+    5: (-108, -94, 24, 38),
+    6: (-126, -114, 32, 37),
+    7: (-128, -117, 37, 44),
+    8: (-128, -116, 44, 49),
+    9: (-68, -64, 16, 20),  # Puerto Rico / USVI
+    10: (-162, -152, 18, 24),  # Hawaii
+}
+
+
+def _find_crm_volume(
+    lon_range: tuple[float, float],
+    lat_range: tuple[float, float],
+) -> int:
+    """Find the CRM volume that best overlaps the requested region."""
+    lon_min, lon_max = min(lon_range), max(lon_range)
+    lat_min, lat_max = min(lat_range), max(lat_range)
+
+    best_vol = None
+    best_overlap = 0.0
+
+    for vol, (vlon_min, vlon_max, vlat_min, vlat_max) in _CRM_VOLUMES.items():
+        # Intersection area
+        dx = max(0, min(lon_max, vlon_max) - max(lon_min, vlon_min))
+        dy = max(0, min(lat_max, vlat_max) - max(lat_min, vlat_min))
+        overlap = dx * dy
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_vol = vol
+
+    if best_vol is None or best_overlap == 0:
+        raise ValueError(
+            "Requested region does not overlap any NOAA CRM volume. "
+            "CRM covers US coastal waters only."
+        )
+    return best_vol
 
 
 def _load_geotiff(
@@ -488,7 +543,6 @@ def load_gebco_opendap(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
-
     assert lon_range is not None and lat_range is not None
 
     if save_path and os.path.exists(save_path):
@@ -549,7 +603,6 @@ def load_emodnet_wcs(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
-
     assert lon_range is not None and lat_range is not None
 
     if save_path and os.path.exists(save_path):
@@ -563,6 +616,193 @@ def load_emodnet_wcs(
     finally:
         if save_path is None:
             Path(filepath).unlink(missing_ok=True)
+
+
+def load_etopo(
+    lon_range: tuple[float, float] | None = None,
+    lat_range: tuple[float, float] | None = None,
+    region: str | None = None,
+    resolution: str = "60s",
+    save_path: str | None = None,
+) -> xr.DataArray:
+    """
+    Download NOAA ETOPO 2022 global relief data.
+
+    ETOPO provides integrated topography and bathymetry from NOAA NCEI,
+    widely used by US-based and global researchers.
+
+    Parameters
+    ----------
+    lon_range : tuple[float, float], optional
+        Longitude bounds (min, max). Cannot be used with 'region'.
+    lat_range : tuple[float, float], optional
+        Latitude bounds (min, max). Cannot be used with 'region'.
+    region : str, optional
+        Preset region name. See `bathy.list_regions()`.
+        Cannot be used with 'lon_range' or 'lat_range'.
+    resolution : str, default '60s'
+        Grid resolution: '60s' (1 arc-minute), '30s', or '15s'.
+    save_path : str, optional
+        If provided, save the downloaded file to this path for reuse.
+        If the file already exists, it is loaded without downloading.
+
+    Returns
+    -------
+    xr.DataArray
+        Elevation data with 'lon' and 'lat' coordinates
+
+    References
+    ----------
+    NOAA National Centers for Environmental Information (2022).
+    ETOPO 2022 15 Arc-Second Global Relief Model.
+    https://doi.org/10.25921/fd45-gt74
+
+    Examples
+    --------
+    >>> data = load_etopo(lon_range=(-10, -5), lat_range=(50, 55))
+    >>> data = load_etopo(region='mediterranean', resolution='30s')
+    """
+    valid_resolutions = {"60s", "30s", "15s"}
+    if resolution not in valid_resolutions:
+        raise ValueError(
+            f"Invalid resolution: {resolution}. Valid: {sorted(valid_resolutions)}"
+        )
+
+    lon_range, lat_range = _resolve_region(
+        lon_range, lat_range, region, require_bounds=True
+    )
+    assert lon_range is not None and lat_range is not None
+
+    if save_path and os.path.exists(save_path):
+        logger.info(f"Using existing file: {save_path}")
+        return _load_netcdf(save_path, lon_range, lat_range, "z", "lon", "lat")
+
+    opendap_url = (
+        f"{_ETOPO_OPENDAP_BASE}/{resolution}/"
+        f"{resolution}_surface_elev_netcdf/"
+        f"ETOPO_2022_v1_{resolution}_N90W180_surface.nc"
+    )
+
+    logger.info(f"Accessing ETOPO 2022 ({resolution}) via OPeNDAP...")
+
+    try:
+        with xr.open_dataset(opendap_url, engine="pydap") as ds:
+            data = (
+                ds["z"]
+                .sel(lon=slice(*sorted(lon_range)), lat=slice(*sorted(lat_range)))
+                .load()
+            )
+    except OSError as e:
+        raise ConnectionError(
+            f"Failed to access ETOPO OPeNDAP server. "
+            f"Check your internet connection or try again later. "
+            f"URL: {opendap_url}"
+        ) from e
+
+    if data.size == 0:
+        raise ValueError(
+            f"Data selection resulted in empty array. "
+            f"Requested: lon={lon_range}, lat={lat_range}."
+        )
+
+    if save_path:
+        data.to_netcdf(save_path)
+        logger.info(f"Saved to {save_path}")
+
+    return data
+
+
+def load_noaa_crm(
+    lon_range: tuple[float, float] | None = None,
+    lat_range: tuple[float, float] | None = None,
+    region: str | None = None,
+    save_path: str | None = None,
+) -> xr.DataArray:
+    """
+    Load NOAA Coastal Relief Model (~3 arc-second / ~90 m) via OPeNDAP.
+
+    High-resolution bathymetry/topography for US coastal waters. The
+    correct CRM volume is selected automatically based on the requested
+    region.
+
+    Parameters
+    ----------
+    lon_range : tuple[float, float], optional
+        Longitude bounds (min, max). Cannot be used with 'region'.
+    lat_range : tuple[float, float], optional
+        Latitude bounds (min, max). Cannot be used with 'region'.
+    region : str, optional
+        Preset region name. See `bathy.list_regions()`.
+        Cannot be used with 'lon_range' or 'lat_range'.
+    save_path : str, optional
+        If provided, save the subsetted data as NetCDF for reuse.
+        If the file already exists, it is loaded without fetching.
+
+    Returns
+    -------
+    xr.DataArray
+        Elevation data with 'lon' and 'lat' coordinates
+
+    Notes
+    -----
+    Coverage is limited to US coastal waters (10 regional volumes).
+    Requesting a region outside US waters will raise a ``ValueError``.
+
+    References
+    ----------
+    NOAA National Centers for Environmental Information.
+    U.S. Coastal Relief Model.
+    https://www.ngdc.noaa.gov/mgg/coastal/crm.html
+
+    Examples
+    --------
+    >>> data = load_noaa_crm(lon_range=(-72, -70), lat_range=(41, 43))
+    >>> data = load_noaa_crm(region='us_east_coast', save_path='crm.nc')
+    """
+    lon_range, lat_range = _resolve_region(
+        lon_range, lat_range, region, require_bounds=True
+    )
+    assert lon_range is not None and lat_range is not None
+
+    if save_path and os.path.exists(save_path):
+        logger.info(f"Using existing file: {save_path}")
+        return _load_netcdf(save_path, lon_range, lat_range, "z", "lon", "lat")
+
+    vol = _find_crm_volume(lon_range, lat_range)
+    opendap_url = f"https://www.ngdc.noaa.gov/thredds/dodsC/crm/crm_vol{vol}.nc"
+
+    logger.info(f"Accessing NOAA CRM volume {vol} via OPeNDAP...")
+
+    try:
+        with xr.open_dataset(opendap_url, engine="pydap") as ds:
+            # CRM uses x/y coordinate names (geographic degrees despite the names)
+            data = (
+                ds["z"]
+                .sel(x=slice(*sorted(lon_range)), y=slice(*sorted(lat_range)))
+                .load()
+            )
+    except OSError as e:
+        raise ConnectionError(
+            f"Failed to access NOAA CRM OPeNDAP server. "
+            f"Check your internet connection or try again later. "
+            f"URL: {opendap_url}"
+        ) from e
+
+    if data.size == 0:
+        raise ValueError(
+            f"Data selection resulted in empty array. "
+            f"Requested: lon={lon_range}, lat={lat_range}. "
+            f"CRM volume {vol} may not fully cover this region."
+        )
+
+    # Rename x/y → lon/lat to match bathy conventions
+    data = data.rename({"x": "lon", "y": "lat"})
+
+    if save_path:
+        data.to_netcdf(save_path)
+        logger.info(f"Saved to {save_path}")
+
+    return data
 
 
 def to_geotiff(

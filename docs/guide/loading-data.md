@@ -47,6 +47,23 @@ print(regions[:10])
 data = bathy.load_gebco_opendap(region="mediterranean")
 ```
 
+## ETOPO 2022 (global)
+
+NOAA's ETOPO 2022 provides integrated topography and bathymetry at three resolutions via OPeNDAP:
+
+```python
+import bathy
+
+data = bathy.load_etopo(
+    lon_range=(-10, -5),
+    lat_range=(50, 55),
+    resolution="60s",  # '60s' (1 arc-min), '30s', or '15s'
+    save_path="data/etopo_region.nc",  # Optional: cache locally
+)
+```
+
+The same preset regions and caching behaviour as GEBCO apply.
+
 ## EMODnet Bathymetry (European seas)
 
 EMODnet provides high-resolution (~115 m) gridded bathymetry for European maritime areas via a Web Coverage Service (WCS):
@@ -71,6 +88,23 @@ data = bathy.load_emodnet_wcs(region="north_sea")
     EMODnet coverage is limited to European seas. Requests outside this area will return an error.
 
 The same download size estimation and `save_path` requirement for large regions applies to EMODnet downloads.
+
+## NOAA Coastal Relief Model (US coasts)
+
+High-resolution (~90 m / 3 arc-second) bathymetry and topography for US coastal waters. The correct regional volume is selected automatically based on the bounding box:
+
+```python
+import bathy
+
+data = bathy.load_noaa_crm(
+    lon_range=(-72, -70),
+    lat_range=(41, 43),
+    save_path="data/crm_region.nc",  # Optional: cache locally
+)
+```
+
+!!! note
+    CRM coverage is limited to US coastal waters (10 regional volumes covering the East Coast, Gulf, West Coast, Puerto Rico, and Hawaii). Requesting a region outside US waters will raise a `ValueError`.
 
 ## Local NetCDF files
 

@@ -52,6 +52,7 @@ nav:
       - Visualisation: guide/visualisation.md
   - Examples:
       - Basic Usage: examples/basic_usage.ipynb
+      - Downloading Data: examples/downloading_data.ipynb
       - Profiles: examples/profiles.ipynb
       - Draw Profile: examples/draw_profile.py
   - API Reference:
