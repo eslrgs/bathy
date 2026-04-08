@@ -543,7 +543,7 @@ def load_gebco_opendap(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
-    assert lon_range is not None and lat_range is not None
+    assert lon_range is not None and lat_range is not None  # noqa: S101
 
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")
@@ -603,7 +603,7 @@ def load_emodnet_wcs(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
-    assert lon_range is not None and lat_range is not None
+    assert lon_range is not None and lat_range is not None  # noqa: S101
 
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")
@@ -671,7 +671,7 @@ def load_etopo(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
-    assert lon_range is not None and lat_range is not None
+    assert lon_range is not None and lat_range is not None  # noqa: S101
 
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")
@@ -762,7 +762,7 @@ def load_noaa_crm(
     lon_range, lat_range = _resolve_region(
         lon_range, lat_range, region, require_bounds=True
     )
-    assert lon_range is not None and lat_range is not None
+    assert lon_range is not None and lat_range is not None  # noqa: S101
 
     if save_path and os.path.exists(save_path):
         logger.info(f"Using existing file: {save_path}")
