@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.12+-yellow)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-`bathy`, from Greek *βαθύς* (bathýs) meaning "deep", is a Python package for bathymetric analysis and visualisation.
+`bathy`, from Greek *βαθύς* (bathýs), meaning "deep", is a Python package for bathymetric analysis and visualisation.
 
 **[Documentation](https://eslrgs.github.io/bathy)** · [Installation](#installation) · [Features](#features) · [Examples](#examples)
 
