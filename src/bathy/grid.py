@@ -432,6 +432,11 @@ def fill_gaps(
     if not mask.any():
         return data
 
+    if not (~mask).any():
+        raise ValueError(
+            "Cannot fill gaps: all values are NaN, no valid data to interpolate from"
+        )
+
     xs = data[x_dim].values
     ys = data[y_dim].values
     xx, yy = np.meshgrid(xs, ys)

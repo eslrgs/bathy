@@ -150,7 +150,8 @@ def _calculate_num_points(
             raise ValueError(f"num_points must be at least 1, got {num_points}")
         return num_points
 
-    assert point_spacing is not None  # noqa: S101
+    if point_spacing is None:  # pragma: no cover
+        raise ValueError("point_spacing must be provided when num_points is None")
     if point_spacing <= 0:
         raise ValueError(f"point_spacing must be positive, got {point_spacing}")
 

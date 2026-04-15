@@ -53,6 +53,7 @@ nav:
   - Examples:
       - Basic Usage: examples/basic_usage.ipynb
       - Downloading Data: examples/downloading_data.ipynb
+      - Grid Operations: examples/grid_operations.ipynb
       - Profiles: examples/profiles.ipynb
       - Draw Profile: examples/draw_profile.py
   - API Reference:
